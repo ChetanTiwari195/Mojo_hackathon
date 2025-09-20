@@ -41,3 +41,23 @@ export const getAllAccounts = async (req, res) => {
       .json({ error: "Failed to fetch accounts.", details: error.message });
   }
 };
+
+// Delete an account
+export const deleteAccount = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const account = await Account.findByPk(id);
+    if (!account) {
+      return res.status(404).json({ error: "Account not found." });
+    }
+
+    await account.destroy();
+    res.status(200).json({ message: "Account deleted successfully!" });
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to delete account.",
+      details: error.message,
+    });
+  }
+};

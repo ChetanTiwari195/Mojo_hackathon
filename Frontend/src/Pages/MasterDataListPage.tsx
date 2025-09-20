@@ -31,6 +31,8 @@ interface DataListViewProps {
   description: string;
   items: ListItem[];
   basePath: string;
+  showDelete?: boolean;
+  onDelete?: (id: string | number) => void;
 }
 
 function DataListView({
@@ -38,11 +40,22 @@ function DataListView({
   description,
   items,
   basePath,
+  showDelete = false,
+  onDelete,
 }: DataListViewProps) {
   const navigate = useNavigate();
 
   const handleItemClick = (id: string | number) => {
-    navigate(`${basePath}/${id}/edit`);
+    if (!showDelete) {
+      navigate(`${basePath}/${id}/edit`);
+    }
+  };
+
+  const handleDelete = (e: React.MouseEvent, id: string | number) => {
+    e.stopPropagation();
+    if (onDelete) {
+      onDelete(id);
+    }
   };
 
   return (
@@ -56,8 +69,10 @@ function DataListView({
           {items.map((item) => (
             <div
               key={item.id}
-              onClick={() => handleItemClick(item.id)}
-              className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent group"
+              onClick={showDelete ? undefined : () => handleItemClick(item.id)}
+              className={`flex items-center justify-between p-4 ${
+                !showDelete ? "cursor-pointer hover:bg-accent" : ""
+              } group`}
             >
               <div>
                 <p className="font-medium">{item.name}</p>
@@ -67,7 +82,18 @@ function DataListView({
                   </p>
                 )}
               </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
+              {showDelete ? (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={(e) => handleDelete(e, item.id)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  Delete
+                </Button>
+              ) : (
+                <ChevronRight className="w-5 h-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
+              )}
             </div>
           ))}
           {items.length === 0 && (
@@ -97,6 +123,24 @@ const masterDataConfig = {
       }));
     },
   },
+  products: {
+    title: "Products",
+    description: "Select a product to view or edit its details.",
+    basePath: "/product-master",
+    createPath: "/product-master/create",
+    fetchData: async () => {
+      const response = await axios.get("http://localhost:8000/api/v1/products");
+      return response.data.data.map((product: any) => ({
+        id: product.id,
+        name: product.productName,
+        description: `${product.productType} - Sales: ₹${
+          product.salesPrice
+        } | Purchase: ₹${product.purchasePrice}${
+          product.category ? ` | Category: ${product.category.name}` : ""
+        }`,
+      }));
+    },
+  },
   taxes: {
     title: "Taxes",
     description: "Select a tax rate to view or edit its details.",
@@ -110,6 +154,21 @@ const masterDataConfig = {
         description: `${tax.value}${
           tax.computationMethod === "percentage" ? "%" : " (Fixed)"
         } - Scope: ${tax.taxScope}`,
+      }));
+    },
+  },
+  accounts: {
+    title: "Accounts",
+    description: "Select an account to delete it from the system.",
+    basePath: "/chart-of-accounts",
+    createPath: "/chart-of-accounts/create",
+    showDelete: true,
+    fetchData: async () => {
+      const response = await axios.get("http://localhost:8000/api/v1/accounts");
+      return response.data.data.map((account: any) => ({
+        id: account.id,
+        name: account.accountName,
+        description: `Type: ${account.accountType}`,
       }));
     },
   },
@@ -148,6 +207,27 @@ export function MasterDataListPage() {
     navigate(currentConfig.createPath);
   };
 
+  const handleDelete = async (id: string | number) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this account? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await axios.delete(`http://localhost:8000/api/v1/accounts/${id}`);
+      toast.success("Account deleted successfully!");
+      // Refresh the list
+      const data = await currentConfig.fetchData();
+      setItems(data);
+    } catch (error) {
+      console.error("Failed to delete account:", error);
+      toast.error("Failed to delete account. Please try again.");
+    }
+  };
+
   return (
     <div className="p-4 md:p-8">
       <div className="flex justify-between items-center mb-6">
@@ -161,7 +241,9 @@ export function MasterDataListPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="contacts">Contacts</SelectItem>
+              <SelectItem value="products">Products</SelectItem>
               <SelectItem value="taxes">Taxes</SelectItem>
+              <SelectItem value="accounts">Accounts</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -181,6 +263,8 @@ export function MasterDataListPage() {
           description={currentConfig.description}
           items={items}
           basePath={currentConfig.basePath}
+          showDelete={currentConfig.showDelete || false}
+          onDelete={selectedType === "accounts" ? handleDelete : undefined}
         />
       )}
     </div>

@@ -27,7 +27,6 @@ const ListItem = React.forwardRef<
   React.ElementRef<"a">,
   React.ComponentPropsWithoutRef<"a">
 >(({ className, title, children, ...props }, ref) => {
-
   return (
     <li>
       <NavigationMenuLink asChild>
@@ -57,6 +56,10 @@ function DashboardNavbar() {
   const handleLogout = () => {
     localStorage.removeItem("user");
     navigate("/login");
+  };
+
+  const handleMasterDataClick = () => {
+    navigate("/master-data");
   };
 
   return (
@@ -125,28 +128,17 @@ function DashboardNavbar() {
                 </ul>
               </NavigationMenuContent>
             </NavigationMenuItem>
-
-            <NavigationMenuItem>
-              <NavigationMenuTrigger>Master Data</NavigationMenuTrigger>
-              <NavigationMenuContent>
-                <ul className="grid w-[400px] gap-3 p-4 md:w-[250px] lg:w-[300px]">
-                  <ListItem href="/contact-master" title="Contact Master">
-                    
-                  </ListItem>
-                  <ListItem href="/product-master" title="Product Master">
-                    
-                  </ListItem>
-                  <ListItem href="/tax-master" title="Tax Master">
-                    
-                  </ListItem>
-                  <ListItem href="/chart-of-accounts" title="Chart of Accounts">
-                   
-                  </ListItem>
-                </ul>
-              </NavigationMenuContent>
-            </NavigationMenuItem>
           </NavigationMenuList>
         </NavigationMenu>
+
+        {/* Master Data Button */}
+        <Button
+          variant="ghost"
+          className="text-sm font-medium transition-colors hover:text-foreground/80"
+          onClick={handleMasterDataClick}
+        >
+          Master Data
+        </Button>
       </nav>
 
       {/* Mobile Navigation */}
@@ -175,6 +167,12 @@ function DashboardNavbar() {
             <a href="#" className="text-muted-foreground hover:text-foreground">
               Report
             </a>
+            <button
+              onClick={handleMasterDataClick}
+              className="text-left text-muted-foreground hover:text-foreground"
+            >
+              Master Data
+            </button>
           </nav>
         </SheetContent>
       </Sheet>

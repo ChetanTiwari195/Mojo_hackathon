@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -96,9 +97,14 @@ const fetchHsnCode = async (
 
 // --- The Product Form Component ---
 function ProductForm() {
+  const { id } = useParams(); // Get product ID from URL params
+  const navigate = useNavigate();
+  const isEditing = Boolean(id);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [taxes, setTaxes] = useState<Tax[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
@@ -117,28 +123,54 @@ function ProductForm() {
   const productNameValue = form.watch("productName");
   const productTypeValue = form.watch("productType");
 
-  // Fetch initial data for categories, taxes, etc.
+  // Fetch initial data for categories, taxes, and existing product (if editing)
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       try {
         const [prodResponse, catResponse, taxResponse] = await Promise.all([
           axios.get("http://localhost:8000/api/v1/products"),
           axios.get("http://localhost:8000/api/v1/categories"),
           axios.get("http://localhost:8000/api/v1/taxes"),
         ]);
+
         setProducts(prodResponse.data.data);
         setCategories(catResponse.data.data);
         setTaxes(taxResponse.data.data);
+
+        // If editing, fetch the specific product data
+        if (isEditing && id) {
+          const productResponse = await axios.get(
+            `http://localhost:8000/api/v1/products/${id}`
+          );
+          const productData = productResponse.data.data;
+
+          // Populate form with existing product data
+          form.setValue("productName", productData.productName);
+          form.setValue("productType", productData.productType);
+          form.setValue("categoryId", String(productData.categoryId));
+          form.setValue("hsnCode", productData.hsnCode || "");
+          form.setValue("salesPrice", productData.salesPrice);
+          form.setValue("salesTax", productData.salesTax);
+          form.setValue("purchasePrice", productData.purchasePrice);
+          form.setValue("purchaseTax", productData.purchaseTax);
+        }
       } catch (error) {
-        toast.error("Failed to fetch initial data.");
+        toast.error(
+          isEditing
+            ? "Failed to fetch product data."
+            : "Failed to fetch initial data."
+        );
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
-  }, []);
+  }, [id, isEditing, form]);
 
-  // Debounced effect to fetch HSN code
+  // Debounced effect to fetch HSN code (only for new products)
   useEffect(() => {
-    if (productNameValue.length < 3) {
+    if (isEditing || productNameValue.length < 3) {
       return;
     }
 
@@ -159,7 +191,7 @@ function ProductForm() {
     return () => {
       clearTimeout(handler);
     };
-  }, [productNameValue, productTypeValue, form, products]);
+  }, [productNameValue, productTypeValue, form, products, isEditing]);
 
   function onSubmit(values: ProductFormValues) {
     // Convert categoryId to number for API submission
@@ -168,47 +200,72 @@ function ProductForm() {
       categoryId: parseInt(values.categoryId, 10),
     };
 
-    const apiCall = axios.post(
-      "http://localhost:8000/api/v1/products",
-      payload
-    );
+    const apiCall = isEditing
+      ? axios.put(`http://localhost:8000/api/v1/products/${id}`, payload)
+      : axios.post("http://localhost:8000/api/v1/products", payload);
+
     toast.promise(apiCall, {
-      loading: "Creating product...",
+      loading: isEditing ? "Updating product..." : "Creating product...",
       success: (res) => {
-        form.reset();
-        // Optionally update local products list
-        if (res.data && res.data.data) {
-          setProducts((prev) => [...prev, res.data.data]);
+        if (!isEditing) {
+          form.reset();
+          // Optionally update local products list
+          if (res.data && res.data.data) {
+            setProducts((prev) => [...prev, res.data.data]);
+          }
         }
-        return `Product "${res.data.data.productName}" created successfully!`;
+        return `Product "${res.data.data.productName}" ${
+          isEditing ? "updated" : "created"
+        } successfully!`;
       },
-      error: "Failed to create product.",
+      error: `Failed to ${isEditing ? "update" : "create"} product.`,
     });
+  }
+
+  const handleBack = () => {
+    navigate("/master-data");
+  };
+
+  const handleNew = () => {
+    if (isEditing) {
+      navigate("/product-master/create");
+    } else {
+      form.reset();
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">Loading product data...</div>
+      </div>
+    );
   }
 
   return (
     <div className="max-w-4xl mx-auto my-10 font-sans">
       <div className="flex items-center justify-between mb-4">
         <div className="flex gap-2">
-          <Button variant="outline" type="button" onClick={() => form.reset()}>
+          <Button variant="outline" type="button" onClick={handleNew}>
             New
           </Button>
           <Button type="submit" onClick={form.handleSubmit(onSubmit)}>
-            Confirm
+            {isEditing ? "Update" : "Confirm"}
           </Button>
           <Button variant="outline" type="button">
             Archived
           </Button>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" type="button">
+          <Button variant="outline" type="button" onClick={() => navigate("/")}>
             Home
           </Button>
-          <Button variant="outline" type="button">
+          <Button variant="outline" type="button" onClick={handleBack}>
             Back
           </Button>
         </div>
       </div>
+
       <Card>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -230,45 +287,48 @@ function ProductForm() {
                               const value = e.target.value;
                               field.onChange(value);
 
-                              const matchedProduct = products.find(
-                                (p) =>
-                                  p.productName.toLowerCase() ===
-                                  value.toLowerCase()
-                              );
+                              // Only auto-populate for new products
+                              if (!isEditing) {
+                                const matchedProduct = products.find(
+                                  (p) =>
+                                    p.productName.toLowerCase() ===
+                                    value.toLowerCase()
+                                );
 
-                              if (matchedProduct) {
-                                form.setValue(
-                                  "productName",
-                                  matchedProduct.productName
-                                );
-                                form.setValue(
-                                  "productType",
-                                  matchedProduct.productType
-                                );
-                                form.setValue(
-                                  "categoryId",
-                                  String(matchedProduct.categoryId)
-                                );
-                                form.setValue(
-                                  "hsnCode",
-                                  matchedProduct.hsnCode
-                                );
-                                form.setValue(
-                                  "salesPrice",
-                                  matchedProduct.salesPrice
-                                );
-                                form.setValue(
-                                  "purchasePrice",
-                                  matchedProduct.purchasePrice
-                                );
-                                form.setValue(
-                                  "salesTax",
-                                  matchedProduct.salesTax
-                                );
-                                form.setValue(
-                                  "purchaseTax",
-                                  matchedProduct.purchaseTax
-                                );
+                                if (matchedProduct) {
+                                  form.setValue(
+                                    "productName",
+                                    matchedProduct.productName
+                                  );
+                                  form.setValue(
+                                    "productType",
+                                    matchedProduct.productType
+                                  );
+                                  form.setValue(
+                                    "categoryId",
+                                    String(matchedProduct.categoryId)
+                                  );
+                                  form.setValue(
+                                    "hsnCode",
+                                    matchedProduct.hsnCode
+                                  );
+                                  form.setValue(
+                                    "salesPrice",
+                                    matchedProduct.salesPrice
+                                  );
+                                  form.setValue(
+                                    "purchasePrice",
+                                    matchedProduct.purchasePrice
+                                  );
+                                  form.setValue(
+                                    "salesTax",
+                                    matchedProduct.salesTax
+                                  );
+                                  form.setValue(
+                                    "purchaseTax",
+                                    matchedProduct.purchaseTax
+                                  );
+                                }
                               }
                             }}
                           />
@@ -401,7 +461,7 @@ function ProductForm() {
                                 key={tax.id}
                                 value={String(tax.value)}
                               >
-                                {tax.value}
+                                {tax.taxName} - {tax.value}%
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -452,7 +512,7 @@ function ProductForm() {
                                 key={tax.id}
                                 value={String(tax.value)}
                               >
-                                {tax.value}
+                                {tax.taxName} - {tax.value}%
                               </SelectItem>
                             ))}
                           </SelectContent>

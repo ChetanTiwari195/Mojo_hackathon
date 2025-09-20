@@ -1,7 +1,7 @@
 import Product from "../models/product.model.js";
 import Category from "../models/category.model.js";
 
-// Helper function to fetch HSN code (Corrected)
+// Helper function to fetch HSN code
 const fetchHsnCode = async (productName, productType) => {
   const query = productName.split(" ")[0];
   // Set category to 'P' for goods or 'S' for services
@@ -9,7 +9,6 @@ const fetchHsnCode = async (productName, productType) => {
 
   try {
     const response = await fetch(
-      // Use the corrected URL structure with 'byDesc' and the correct category
       `https://services.gst.gov.in/commonservices/hsn/search/qsearch?inputText=${query}&selectedType=byDesc&category=${category}`
     );
     if (!response.ok) {
@@ -17,7 +16,6 @@ const fetchHsnCode = async (productName, productType) => {
       return null;
     }
     const data = await response.json();
-    // The API response uses 'c' for the code, not 'hsn'
     return data?.data?.[0]?.c || null;
   } catch (error) {
     console.error("Error fetching HSN code:", error);
@@ -37,7 +35,6 @@ export const createProduct = async (req, res) => {
         .json({ error: "Required product fields are missing." });
     }
 
-    // Pass the productType to the fetch function
     const hsnCode = await fetchHsnCode(productName, productType);
 
     const newProduct = await Product.create({
@@ -66,5 +63,102 @@ export const getAllProducts = async (req, res) => {
     res
       .status(500)
       .json({ error: "Failed to fetch products.", details: error.message });
+  }
+};
+
+// Get a single product by ID
+export const getProductById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findByPk(id, {
+      include: [{ model: Category, as: "category" }],
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: "Product not found." });
+    }
+
+    res.status(200).json({ data: product });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: "Failed to fetch product.", details: error.message });
+  }
+};
+
+// Update a product
+export const updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { productName, productType, categoryId, salesPrice, purchasePrice } =
+      req.body;
+
+    // Check if product exists
+    const existingProduct = await Product.findByPk(id);
+    if (!existingProduct) {
+      return res.status(404).json({ error: "Product not found." });
+    }
+
+    // Validate required fields
+    if (!productName || !categoryId || !salesPrice || !purchasePrice) {
+      return res
+        .status(400)
+        .json({ error: "Required product fields are missing." });
+    }
+
+    // Fetch new HSN code if product name or type changed
+    let hsnCode = existingProduct.hsnCode;
+    if (
+      productName !== existingProduct.productName ||
+      productType !== existingProduct.productType
+    ) {
+      const newHsnCode = await fetchHsnCode(productName, productType);
+      // Only update HSN code if we successfully fetched a new one
+      if (newHsnCode) {
+        hsnCode = newHsnCode;
+      }
+      // If fetchHsnCode returns null, keep the existing HSN code
+    }
+
+    // Update the product
+    await existingProduct.update({
+      ...req.body,
+      hsnCode,
+    });
+
+    // Fetch updated product with category
+    const updatedProduct = await Product.findByPk(id, {
+      include: [{ model: Category, as: "category" }],
+    });
+
+    res.status(200).json({
+      message: "Product updated successfully!",
+      data: updatedProduct,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: "Failed to update product.", details: error.message });
+  }
+};
+
+// Delete a product
+export const deleteProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findByPk(id);
+    if (!product) {
+      return res.status(404).json({ error: "Product not found." });
+    }
+
+    await product.destroy();
+
+    res.status(200).json({ message: "Product deleted successfully!" });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: "Failed to delete product.", details: error.message });
   }
 };
