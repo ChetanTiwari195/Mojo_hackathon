@@ -56,6 +56,7 @@ const Product = sequelize.define("Product", {
 
 // Define Relationship to Category
 Category.hasMany(Product, { foreignKey: "categoryId" });
-Product.belongsTo(Category, { foreignKey: "categoryId" });
+// ✅ ADD THE ALIAS HERE
+Product.belongsTo(Category, { foreignKey: "categoryId", as: "category" });
 
 export default Product;

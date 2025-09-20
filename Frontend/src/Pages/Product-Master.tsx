@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import axios from "axios";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,81 +18,95 @@ import {
 } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
-  Command,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandEmpty,
-} from "@/components/ui/command";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // --- Zod Validation Schema ---
 const productFormSchema = z.object({
-  productName: z.string().min(2, "Product name must be at least 2 characters."),
-  productType: z.enum(["goods", "service"], {
-    errorMap: () => ({ message: "You need to select a product type." }),
-  }),
-  category: z.string().min(2, "Category is too short."),
-  hsnSacCode: z.number().min(1000, "Please enter a valid HSN/SAC code."),
-  salesPrice: z.number().positive("Sales price must be positive."),
-  salesTax: z
-    .number()
-    .min(0, "Tax cannot be negative.")
-    .max(100, "Tax cannot exceed 100."),
-  purchasePrice: z.number().positive("Purchase price must be positive."),
-  purchaseTax: z
-    .number()
-    .min(0, "Tax cannot be negative.")
-    .max(100, "Tax cannot exceed 100."),
+  productName: z.string().min(2, "Product name is required."),
+  productType: z.enum(["goods", "service"]),
+  categoryId: z.string().min(1, "Category is required."),
+  hsnCode: z.string().optional(),
+  salesPrice: z.coerce.number().positive("Sales price must be positive."),
+  salesTax: z.coerce.number().min(0, "Sales tax is required."),
+  purchasePrice: z.coerce.number().positive("Purchase price must be positive."),
+  purchaseTax: z.coerce.number().min(0, "Purchase tax is required."),
 });
 
-// Define the form values type from the schema
 type ProductFormValues = z.infer<typeof productFormSchema>;
 
-// --- API Fetching and Types ---
-interface HsnSuggestion {
-  c: string; // HSN Code
-  n: string; // Description
+// --- API Types ---
+interface Product {
+  id: number;
+  productName: string;
+  productType: "goods" | "service";
+  categoryId: number;
+  hsnCode: string;
+  salesPrice: number;
+  purchasePrice: number;
+  salesTax: number;
+  purchaseTax: number;
 }
 
-async function fetchHsnSuggestions(
-  query: string,
-  productType: "goods" | "service"
-): Promise<HsnSuggestion[]> {
-  if (query.length < 2) return [];
+interface Category {
+  id: number;
+  name: string;
+}
 
+interface Tax {
+  id: number;
+  taxName: string;
+  value: number;
+}
+
+// --- HSN Code Fetching Utility ---
+const fetchHsnCode = async (
+  productName: string,
+  productType: "goods" | "service"
+) => {
+  if (!productName || productName.trim().length < 3) {
+    return null;
+  }
+  const query = productName.split(" ")[0];
+  // Set category to 'P' for goods or 'S' for services
   const category = productType === "goods" ? "P" : "S";
-  const searchType = /^\d+$/.test(query) ? "byCode" : "byDesc";
-  const endpoint = `https://services.gst.gov.in/commonservices/hsn/search/qsearch?inputText=${query}&selectedType=${searchType}&category=${category}`;
 
   try {
-    const response = await fetch(endpoint);
+    // NOTE: This is a direct API call that might be blocked by CORS in a browser environment.
+    // A backend proxy is recommended for production use.
+    const response = await fetch(
+      `https://services.gst.gov.in/commonservices/hsn/search/qsearch?inputText=${query}&selectedType=byDesc&category=${category}`
+    );
     if (!response.ok) {
-      throw new Error("Network response was not ok");
+      console.error("Failed to fetch HSN data. Status:", response.status);
+      return null;
     }
     const data = await response.json();
-    return data.data || [];
+    // The API response uses 'c' for the code
+    return data?.data?.[0]?.c || null;
   } catch (error) {
-    console.error("Failed to fetch HSN/SAC suggestions:", error);
-    return [];
+    console.error("Error fetching HSN code:", error);
+    return null;
   }
-}
+};
 
 // --- The Product Form Component ---
 function ProductForm() {
-  const [hsnQuery, setHsnQuery] = React.useState("");
-  const [hsnSuggestions, setHsnSuggestions] = React.useState<HsnSuggestion[]>(
-    []
-  );
-  const [isHsnLoading, setIsHsnLoading] = React.useState(false);
-  const [isHsnListOpen, setIsHsnListOpen] = React.useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [taxes, setTaxes] = useState<Tax[]>([]);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
       productName: "",
       productType: "goods",
-      category: "",
-      hsnSacCode: 0,
+      categoryId: "",
+      hsnCode: "",
       salesPrice: 0,
       salesTax: 0,
       purchasePrice: 0,
@@ -98,50 +114,104 @@ function ProductForm() {
     },
   });
 
-  const productType = form.watch("productType");
+  const productNameValue = form.watch("productName");
+  const productTypeValue = form.watch("productType");
 
-  React.useEffect(() => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      if (hsnQuery) {
-        setIsHsnLoading(true);
-        fetchHsnSuggestions(hsnQuery, productType)
-          .then((suggestions) => {
-            setHsnSuggestions(suggestions);
-          })
-          .finally(() => setIsHsnLoading(false));
-      } else {
-        setHsnSuggestions([]);
+  // Fetch initial data for categories, taxes, etc.
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [prodResponse, catResponse, taxResponse] = await Promise.all([
+          axios.get("http://localhost:8000/api/v1/products"),
+          axios.get("http://localhost:8000/api/v1/categories"),
+          axios.get("http://localhost:8000/api/v1/taxes"),
+        ]);
+        setProducts(prodResponse.data.data);
+        setCategories(catResponse.data.data);
+        setTaxes(taxResponse.data.data);
+      } catch (error) {
+        toast.error("Failed to fetch initial data.");
       }
-    }, 300);
+    };
+    fetchData();
+  }, []);
+
+  // Debounced effect to fetch HSN code
+  useEffect(() => {
+    if (productNameValue.length < 3) {
+      return;
+    }
+
+    const isExistingProduct = products.some(
+      (p) => p.productName.toLowerCase() === productNameValue.toLowerCase()
+    );
+    if (isExistingProduct) {
+      return; // Don't fetch if it's an existing product, as that's handled onChange
+    }
+
+    const handler = setTimeout(async () => {
+      const hsnCode = await fetchHsnCode(productNameValue, productTypeValue);
+      if (hsnCode) {
+        form.setValue("hsnCode", hsnCode, { shouldValidate: true });
+      }
+    }, 500); // 500ms delay
 
     return () => {
-      clearTimeout(timer);
-      controller.abort();
+      clearTimeout(handler);
     };
-  }, [hsnQuery, productType]);
+  }, [productNameValue, productTypeValue, form, products]);
 
   function onSubmit(values: ProductFormValues) {
-    console.log("Form Submitted:", values);
-    alert("Product created successfully! Check the console for data.");
+    // Convert categoryId to number for API submission
+    const payload = {
+      ...values,
+      categoryId: parseInt(values.categoryId, 10),
+    };
+
+    const apiCall = axios.post(
+      "http://localhost:8000/api/v1/products",
+      payload
+    );
+    toast.promise(apiCall, {
+      loading: "Creating product...",
+      success: (res) => {
+        form.reset();
+        // Optionally update local products list
+        if (res.data && res.data.data) {
+          setProducts((prev) => [...prev, res.data.data]);
+        }
+        return `Product "${res.data.data.productName}" created successfully!`;
+      },
+      error: "Failed to create product.",
+    });
   }
 
   return (
     <div className="max-w-4xl mx-auto my-10 font-sans">
       <div className="flex items-center justify-between mb-4">
         <div className="flex gap-2">
-          <Button variant="outline">New</Button>
-          <Button onClick={form.handleSubmit(onSubmit)}>Confirm</Button>
-          <Button variant="outline">Archived</Button>
+          <Button variant="outline" type="button" onClick={() => form.reset()}>
+            New
+          </Button>
+          <Button type="submit" onClick={form.handleSubmit(onSubmit)}>
+            Confirm
+          </Button>
+          <Button variant="outline" type="button">
+            Archived
+          </Button>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">Home</Button>
-          <Button variant="outline">Back</Button>
+          <Button variant="outline" type="button">
+            Home
+          </Button>
+          <Button variant="outline" type="button">
+            Back
+          </Button>
         </div>
       </div>
       <Card>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <CardContent className="pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                 {/* Left Column */}
@@ -154,8 +224,53 @@ function ProductForm() {
                         <FormLabel>Product Name</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="e.g., Table Tennis Bat"
+                            placeholder="Enter product name"
                             {...field}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              field.onChange(value);
+
+                              const matchedProduct = products.find(
+                                (p) =>
+                                  p.productName.toLowerCase() ===
+                                  value.toLowerCase()
+                              );
+
+                              if (matchedProduct) {
+                                form.setValue(
+                                  "productName",
+                                  matchedProduct.productName
+                                );
+                                form.setValue(
+                                  "productType",
+                                  matchedProduct.productType
+                                );
+                                form.setValue(
+                                  "categoryId",
+                                  String(matchedProduct.categoryId)
+                                );
+                                form.setValue(
+                                  "hsnCode",
+                                  matchedProduct.hsnCode
+                                );
+                                form.setValue(
+                                  "salesPrice",
+                                  matchedProduct.salesPrice
+                                );
+                                form.setValue(
+                                  "purchasePrice",
+                                  matchedProduct.purchasePrice
+                                );
+                                form.setValue(
+                                  "salesTax",
+                                  matchedProduct.salesTax
+                                );
+                                form.setValue(
+                                  "purchaseTax",
+                                  matchedProduct.purchaseTax
+                                );
+                              }
+                            }}
                           />
                         </FormControl>
                         <FormMessage />
@@ -171,7 +286,7 @@ function ProductForm() {
                         <FormControl>
                           <RadioGroup
                             onValueChange={field.onChange}
-                            defaultValue={field.value}
+                            value={field.value}
                             className="flex items-center space-x-4"
                           >
                             <FormItem className="flex items-center space-x-2 space-y-0">
@@ -198,81 +313,43 @@ function ProductForm() {
                   />
                   <FormField
                     control={form.control}
-                    name="category"
+                    name="categoryId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., Sports Equipment"
-                            {...field}
-                          />
-                        </FormControl>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories.map((cat) => (
+                              <SelectItem key={cat.id} value={String(cat.id)}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <FormField
                     control={form.control}
-                    name="hsnSacCode"
+                    name="hsnCode"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>HSN/SAC Code</FormLabel>
                         <FormControl>
-                          <Command
-                            shouldFilter={false}
-                            className="overflow-visible"
-                          >
-                            <CommandInput
-                              placeholder="Search by code or description..."
-                              value={hsnQuery}
-                              onValueChange={setHsnQuery}
-                              onFocus={() => setIsHsnListOpen(true)}
-                              onBlur={() =>
-                                setTimeout(() => setIsHsnListOpen(false), 150)
-                              }
-                            />
-                            <div className="relative">
-                              {isHsnListOpen && hsnQuery.length > 1 && (
-                                <CommandList className="absolute top-1 w-full z-10 bg-background border rounded-md shadow-md">
-                                  {isHsnLoading ? (
-                                    <div className="p-2 text-sm text-center">
-                                      Fetching...
-                                    </div>
-                                  ) : hsnSuggestions.length > 0 ? (
-                                    hsnSuggestions.map((suggestion) => (
-                                      <CommandItem
-                                        key={suggestion.c}
-                                        value={`${suggestion.c} - ${suggestion.n}`}
-                                        onSelect={() => {
-                                          form.setValue(
-                                            "hsnSacCode",
-                                            parseInt(suggestion.c, 10)
-                                          );
-                                          setHsnQuery(
-                                            `${suggestion.c} - ${suggestion.n}`
-                                          );
-                                          setIsHsnListOpen(false);
-                                          setHsnSuggestions([]);
-                                        }}
-                                      >
-                                        <span className="font-medium mr-2">
-                                          {suggestion.c}
-                                        </span>
-                                        <span className="text-muted-foreground">
-                                          {suggestion.n}
-                                        </span>
-                                      </CommandItem>
-                                    ))
-                                  ) : (
-                                    <CommandEmpty>
-                                      No results found.
-                                    </CommandEmpty>
-                                  )}
-                                </CommandList>
-                              )}
-                            </div>
-                          </Command>
+                          <Input
+                            readOnly
+                            placeholder="Auto-filled"
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -289,14 +366,7 @@ function ProductForm() {
                       <FormItem>
                         <FormLabel>Sales Price (Rs)</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="22.20"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseFloat(e.target.value) || 0)
-                            }
-                          />
+                          <Input type="number" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -308,16 +378,34 @@ function ProductForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Sales Tax (%)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="5"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseFloat(e.target.value) || 0)
-                            }
-                          />
-                        </FormControl>
+                        <Select
+                          onValueChange={(value) => {
+                            const numericValue = Number(value);
+                            form.setValue("salesTax", numericValue, {
+                              shouldValidate: true,
+                            });
+                            form.setValue("purchaseTax", numericValue, {
+                              shouldValidate: true,
+                            });
+                          }}
+                          value={field.value > 0 ? String(field.value) : ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a tax" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {taxes.map((tax) => (
+                              <SelectItem
+                                key={tax.id}
+                                value={String(tax.value)}
+                              >
+                                {tax.value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -329,14 +417,7 @@ function ProductForm() {
                       <FormItem>
                         <FormLabel>Purchase Price (Rs)</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="15.00"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseFloat(e.target.value) || 0)
-                            }
-                          />
+                          <Input type="number" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -348,16 +429,34 @@ function ProductForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Purchase Tax (%)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="5"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseFloat(e.target.value) || 0)
-                            }
-                          />
-                        </FormControl>
+                        <Select
+                          onValueChange={(value) => {
+                            const numericValue = Number(value);
+                            form.setValue("purchaseTax", numericValue, {
+                              shouldValidate: true,
+                            });
+                            form.setValue("salesTax", numericValue, {
+                              shouldValidate: true,
+                            });
+                          }}
+                          value={field.value > 0 ? String(field.value) : ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a tax" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {taxes.map((tax) => (
+                              <SelectItem
+                                key={tax.id}
+                                value={String(tax.value)}
+                              >
+                                {tax.value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
