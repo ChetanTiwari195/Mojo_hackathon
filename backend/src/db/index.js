@@ -22,4 +22,5 @@ const connectDB = async () => {
   }
 };
 
+
 export { sequelize, connectDB };
