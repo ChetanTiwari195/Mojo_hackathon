@@ -1,8 +1,9 @@
 import React from "react";
-import { Upload } from "lucide-react";
+import { Upload, Loader2 } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import axios, { isAxiosError } from "axios"; // MODIFIED: Import isAxiosError for better type safety
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,54 +23,102 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-// Validation Schema for the Contact Form
+// MODIFIED: Added the 'type' field to the validation schema
 const contactFormSchema = z.object({
   contactName: z.string().min(2, "Name must be at least 2 characters."),
   email: z.email("Please enter a valid email."),
-  phone: z.coerce
-    .number()
-    .min(1000000000, "Please enter a valid 10-digit phone number."),
+  phone: z.string().refine((val) => /^\d{10}$/.test(val), {
+    message: "Please enter a valid 10-digit phone number.",
+  }),
+  // FIX #1: Add the 'type' field to the schema to match the form
+  type: z.enum(["customer", "vendor", "both"], {
+    required_error: "Please select a contact type.",
+  }),
   address: z.string().min(5, "Address is too short."),
   city: z.string().min(2, "City name is too short."),
   state: z.string().min(2, "State name is too short."),
-  postcode: z.coerce
-    .number()
-    .min(100000, "Please enter a valid 6-digit postcode."),
-  // We'll handle the image separately, so it's not in the Zod schema for form data
+  pincode: z.string().refine((val) => /^\d{6}$/.test(val), {
+    message: "Please enter a valid 6-digit pincode.",
+  }),
 });
 
-// The New Contact Form Component
+// NEW: Create a type alias from the schema for stronger type safety
+type ContactFormValues = z.infer<typeof contactFormSchema>;
+
 function ContactForm() {
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
+  const [imageFile, setImageFile] = React.useState<File | null>(null);
+  const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const form = useForm<z.infer<typeof contactFormSchema>>({
+  // MODIFIED: Use the new type alias and corrected default values
+  const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
     defaultValues: {
       contactName: "",
       email: "",
-      phone: undefined,
+      phone: "",
+      // FIX #2: Remove 'type' from here; its default is handled by the form state
       address: "",
       city: "",
       state: "",
-      postcode: undefined,
+      pincode: "",
     },
   });
 
-  function onSubmit(values: z.infer<typeof contactFormSchema>) {
-    // Handle form submission logic
-    console.log({
-      formData: values,
-      // In a real app, you would handle the file upload here.
-      // For example, using FormData to send to an API.
+  // MODIFIED: Use the new type alias for the 'values' parameter
+  async function onSubmit(values: ContactFormValues) {
+    setIsLoading(true);
+    const formData = new FormData();
+
+    Object.entries(values).forEach(([key, value]) => {
+      formData.append(key, value);
     });
-    alert("Contact created successfully! Check the console for the form data.");
+
+    if (imageFile) {
+      formData.append("image", imageFile);
+    }
+
+    try {
+      const response = await axios.post(
+        "http://localhost:8000/api/v1/contacts",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      console.log("Success:", response.data);
+      toast.success("Contact has been created successfully.");
+      form.reset();
+      setImagePreview(null);
+      setImageFile(null);
+    } catch (error) {
+      console.error("Failed to create contact:", error);
+      // MODIFIED: Use isAxiosError for type-safe error handling
+      if (isAxiosError(error)) {
+        const errorMessage =
+          error.response?.data?.error || "An unknown server error occurred.";
+        toast.error(`Failed to create contact: ${errorMessage}`);
+      } else {
+        toast.error("An unexpected error occurred.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setImageFile(file);
       setImagePreview(URL.createObjectURL(file));
     }
   };
@@ -81,7 +130,9 @@ function ContactForm() {
   return (
     <Card className="max-w-4xl mx-auto my-10">
       <CardHeader>
-        <CardTitle className="text-2xl font-semibold">Contact Information</CardTitle>
+        <CardTitle className="text-2xl font-semibold">
+          Contact Information
+        </CardTitle>
         <CardDescription>
           Fill out the form to add a new contact.
         </CardDescription>
@@ -90,8 +141,8 @@ function ContactForm() {
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {/* Left Column: Form Fields */}
               <div className="md:col-span-2 grid gap-6">
+                {/* ... other fields like contactName, email ... */}
                 <FormField
                   control={form.control}
                   name="contactName"
@@ -112,7 +163,11 @@ function ContactForm() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="user@example.com" {...field} />
+                        <Input
+                          type="email"
+                          placeholder="user@example.com"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -125,16 +180,40 @@ function ContactForm() {
                     <FormItem>
                       <FormLabel>Phone</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="9876543210"
-                          {...field}
-                        />
+                        <Input placeholder="9876543210" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                {/* FIX #3: Correctly implemented the Select component */}
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type</FormLabel> {/* Corrected label */}
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="customer">Customer</SelectItem>
+                          <SelectItem value="vendor">Vendor</SelectItem>
+                          <SelectItem value="both">Both</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="address"
@@ -148,6 +227,7 @@ function ContactForm() {
                     </FormItem>
                   )}
                 />
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
@@ -156,7 +236,7 @@ function ContactForm() {
                       <FormItem>
                         <FormLabel>City</FormLabel>
                         <FormControl>
-                          <Input placeholder="Anytown" {...field} />
+                          <Input placeholder="Bengaluru" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -169,7 +249,7 @@ function ContactForm() {
                       <FormItem>
                         <FormLabel>State</FormLabel>
                         <FormControl>
-                          <Input placeholder="State" {...field} />
+                          <Input placeholder="Karnataka" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -177,16 +257,12 @@ function ContactForm() {
                   />
                   <FormField
                     control={form.control}
-                    name="postcode"
+                    name="pincode"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Postcode</FormLabel>
+                        <FormLabel>Pincode</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="123456"
-                            {...field}
-                          />
+                          <Input placeholder="560001" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -195,7 +271,7 @@ function ContactForm() {
                 </div>
               </div>
 
-              {/* Right Column: Image Upload */}
+              {/* ... Image Upload Section ... */}
               <div className="md:col-span-1 flex flex-col items-center justify-center gap-4">
                 <input
                   type="file"
@@ -225,7 +301,10 @@ function ContactForm() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-start border-t pt-6 mt-6">
-            <Button type="submit">Confirm</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isLoading ? "Submitting..." : "Confirm"}
+            </Button>
           </CardFooter>
         </form>
       </Form>

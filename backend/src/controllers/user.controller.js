@@ -77,3 +77,97 @@ export const userLogin = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// Update User
+export const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params; // user ID from URL
+    const { name, role, email, password, profile_image } = req.body;
+
+    // 1️⃣ Find the user
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // 2️⃣ Prepare update data
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (role) updateData.role = role;
+    if (email) updateData.email = email;
+    if (profile_image !== undefined) updateData.profile_image = profile_image;
+
+    // 3️⃣ Hash password if provided
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      updateData.password = hashedPassword;
+    }
+
+    // 4️⃣ Update user
+    await user.update(updateData);
+
+    res.status(200).json({
+      message: "User updated successfully",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profile_image: user.profile_image,
+      },
+    });
+  } catch (error) {
+    console.error("Update user error:", error);
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      attributes: { exclude: ["password"] }, // Exclude password from response
+    });
+
+    res.status(200).json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error,
+    });
+  }
+};
+
+// Get User by id
+export const getUserById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const user = await User.findByPk(id, {
+      attributes: { exclude: ["password"] }, // Exclude password
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: `User with ID ${id} not found`,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error,
+    });
+  }
+};

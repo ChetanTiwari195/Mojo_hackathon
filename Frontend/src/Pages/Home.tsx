@@ -1,5 +1,4 @@
 
-// A simple icon component for the down arrow, similar to what you might find in lucide-react
 const ArrowDownIcon = (props) => (
   <svg
     {...props}

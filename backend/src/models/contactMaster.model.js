@@ -27,7 +27,7 @@ const ContactMaster = sequelize.define("ContactMaster", {
   },
   city: {
     type: DataTypes.STRING,
-  },
+  }, 
   state: {
     type: DataTypes.STRING,
   },
