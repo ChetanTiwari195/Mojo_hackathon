@@ -1,10 +1,9 @@
 // file: context/AuthContext.js
 
 import React, { createContext, useState, useContext, useEffect } from "react";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 
-// Define the types needed for our context
-// You can move these to a separate types file (e.g., types.ts)
+// --- Types are unchanged ---
 type User = {
   id: number;
   name: string;
@@ -23,81 +22,89 @@ type ApiLoginResponse = {
   user: User;
 };
 
-// Define the shape of the context value
 type AuthContextType = {
   user: User | null;
   token: string | null;
-  login: (credentials: LoginCredentials) => Promise<any>; // Return promise for toast.promise
+  loading: boolean;
+  login: (credentials: LoginCredentials) => Promise<any>;
   logout: () => void;
 };
 
-// 1. Create the context with an initial undefined value
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// 2. Create the provider component
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(
+  const [token, setToken] = useState<string | null>(() =>
     localStorage.getItem("accessToken")
   );
+  const [loading, setLoading] = useState(true);
 
-  // On initial load, check localStorage to keep the user logged in
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    const storedToken = localStorage.getItem("accessToken");
-    if (storedUser && storedToken) {
-      try {
-        setUser(JSON.parse(storedUser));
-        setToken(storedToken);
-      } catch (error) {
-        // If parsing fails, clear out the stored data
-        logout();
-      }
-    }
-  }, []);
+ useEffect(() => {
+   const fetchUser = async () => {
+     // If there's no token, we can stop loading immediately.
+     if (!token) {
+       setLoading(false);
+       return;
+     }
 
-  // Login function now handles the API call
+     // If there IS a token, we must wait for the API call to finish.
+     try {
+       const response = await axios.get(
+         "http://localhost:8000/api/v1/profile",
+         {
+           headers: { Authorization: `Bearer ${token}` },
+         }
+       );
+       setUser(response.data.user);
+     } catch (error) {
+       console.error("Token validation failed, logging out:", error);
+       // Using logout() here will clear the invalid token
+       logout();
+     } finally {
+       // ✨ FIX: This now runs ONLY after the try/catch block is complete.
+       setLoading(false);
+     }
+   };
+
+   fetchUser();
+ }, [token]); 
+
   const login = async (credentials: LoginCredentials) => {
-    // The function returns the axios promise so that
-    // react-sonner's toast.promise can handle it directly.
     return axios
       .post<ApiLoginResponse>("http://localhost:8000/api/v1/login", credentials)
       .then((response) => {
         const { token, user } = response.data;
 
-        // --- This is the key part ---
-        // 1. Store token and user in localStorage
+        // 1. Store ONLY the token in localStorage
         localStorage.setItem("accessToken", token);
-        localStorage.setItem("user", JSON.stringify(user));
 
-        // 2. Update the state
+        // 2. Update state for token and user
         setToken(token);
         setUser(user);
 
-        return response; // Forward the response to the caller
+        return response;
       })
       .catch((error) => {
-        // If login fails, ensure state is cleared
-        logout();
-        // Re-throw the error so toast.promise's error handler catches it
+        logout(); // Ensure everything is cleared on failure
         throw error;
       });
   };
 
-  // Logout function clears everything
   const logout = () => {
-    localStorage.removeItem("user");
+    // 1. Remove ONLY the token from localStorage
     localStorage.removeItem("accessToken");
-    setUser(null);
+
+    // 2. Clear state
     setToken(null);
+    setUser(null);
   };
 
-  const value = { user, token, login, logout };
+  const value = { user, token, login, logout, loading };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// 3. Custom hook for easy consumption
+// --- useAuth hook is unchanged ---
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

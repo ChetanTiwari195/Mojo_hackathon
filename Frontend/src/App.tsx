@@ -5,8 +5,7 @@ import { Route, Routes } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 
 // Page and Component Imports
-import ProtectedRoutes from "./components/ProtectedRoutes"; // ✅ Import the new component
-import AdminRoutes from "./components/AdminRoutes";
+import RoleBasedRoutes from "./components/RoleBasedRoutes"; 
 import Dashboard from "./Pages/Home";
 import { LoginForm } from "./Pages/Login";
 import { SignupForm } from "./Pages/SignUp";
@@ -30,11 +29,12 @@ function App() {
   return (
     <div>
       <Toaster richColors position="top-right" />
+
       <Routes>
-        {/* --- Public Routes --- */}
-        {/* These routes are accessible to everyone. */}
+        {/* --- Public Routes (Accessible to everyone) --- */}
         <Route path="/login" element={<LoginForm />} />
         <Route path="/signup" element={<SignupForm />} />
+        <Route path="/create" element={<CreateUserForm />} />
         <Route
           path="/customer-invoice-portal"
           element={<CustomerInvoicePortal />}
@@ -42,10 +42,10 @@ function App() {
         <Route path="/payment/:id" element={<PaymentPage />} />
         <Route path="/payment-success" element={<PaymentSuccessPage />} />
 
-        {/* --- Protected Routes --- */}
-        {/* All routes inside here will require a user to be logged in. */}
-        {/* They will also share the DashboardNavbar layout. */}
-        <Route element={<ProtectedRoutes />}>
+        {/* --- Routes for Admin & Invoicing (Create and View) --- */}
+        <Route
+          element={<RoleBasedRoutes allowedRoles={["Admin", "Invoicing"]} />}
+        >
           <Route path="/" element={<Dashboard />} />
           <Route path="/master-data" element={<MasterDataListPage />} />
           <Route path="/contact-master/create" element={<ContactForm />} />
@@ -61,15 +61,13 @@ function App() {
             element={<ProfitLossStatement />}
           />
           <Route path="/balance-sheet" element={<BalanceSheet />} />
+        </Route>
 
-          {/* --- Nested Admin-Only Routes --- */}
-          {/* These require the user to be a logged-in ADMIN. */}
-          <Route element={<AdminRoutes />}>
-            <Route path="/create" element={<CreateUserForm />} />
-            <Route path="/contact-master/:id/edit" element={<ContactForm />} />
-            <Route path="/product-master/:id/edit" element={<ProductForm />} />
-            <Route path="/tax-master/:id/edit" element={<TaxForm />} />
-          </Route>
+        {/* --- Routes for Admin ONLY (Edit) --- */}
+        <Route element={<RoleBasedRoutes allowedRoles={["Admin"]} />}>
+          <Route path="/contact-master/:id/edit" element={<ContactForm />} />
+          <Route path="/product-master/:id/edit" element={<ProductForm />} />
+          <Route path="/tax-master/:id/edit" element={<TaxForm />} />
         </Route>
 
         {/* Optional: Add a "Not Found" route */}
