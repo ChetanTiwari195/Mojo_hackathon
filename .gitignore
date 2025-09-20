@@ -11,7 +11,8 @@ constants.js
 # Dependency directories
 node_modules/
 npm_modules/
-
+credential.js
+constants.js
 dist
 dist-ssr
 *.local

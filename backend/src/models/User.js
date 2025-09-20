@@ -34,10 +34,10 @@ const User = sequelize.define("User", {
   }
 }, {
   tableName: "users",
-  timestamps: true,
-  createdAt: "created_at",
-  updatedAt: false
+  timestamps: true,          // ✅ enable timestamps
+  createdAt: "created_at",   // ✅ map to your column
+  updatedAt: false           // ✅ disable updatedAt since your table doesn’t have it
 });
 
+
 export default User;
-    
