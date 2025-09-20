@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom"; // NEW: Import hooks for routing
 import { Upload, Loader2 } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import axios, { isAxiosError } from "axios"; // MODIFIED: Import isAxiosError for better type safety
+import axios, { isAxiosError } from "axios";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,14 +33,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// MODIFIED: Added the 'type' field to the validation schema
+// Schema remains the same
 const contactFormSchema = z.object({
   contactName: z.string().min(2, "Name must be at least 2 characters."),
-  email: z.email("Please enter a valid email."),
+  email: z
+    .string()
+    .email("Please enter a valid email.")
+    .optional()
+    .or(z.literal("")),
   phone: z.string().refine((val) => /^\d{10}$/.test(val), {
     message: "Please enter a valid 10-digit phone number.",
   }),
-  // FIX #1: Add the 'type' field to the schema to match the form
   type: z.enum(["customer", "vendor", "both"], {
     required_error: "Please select a contact type.",
   }),
@@ -51,23 +55,25 @@ const contactFormSchema = z.object({
   }),
 });
 
-// NEW: Create a type alias from the schema for stronger type safety
 type ContactFormValues = z.infer<typeof contactFormSchema>;
 
+// MODIFIED: The component now handles both create and edit
 function ContactForm() {
-  const [imagePreview, setImagePreview] = React.useState<string | null>(null);
-  const [imageFile, setImageFile] = React.useState<File | null>(null);
-  const [isLoading, setIsLoading] = React.useState<boolean>(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const { id: contactId } = useParams(); // NEW: Get the ID from the URL
+  const navigate = useNavigate(); // NEW: Hook for navigation
+  const isEditMode = Boolean(contactId); // NEW: Determine if we are in "edit" mode
 
-  // MODIFIED: Use the new type alias and corrected default values
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
     defaultValues: {
       contactName: "",
       email: "",
       phone: "",
-      // FIX #2: Remove 'type' from here; its default is handled by the form state
       address: "",
       city: "",
       state: "",
@@ -75,38 +81,77 @@ function ContactForm() {
     },
   });
 
-  // MODIFIED: Use the new type alias for the 'values' parameter
+  // NEW: useEffect to fetch data when in edit mode
+  useEffect(() => {
+    if (isEditMode) {
+      const fetchContactData = async () => {
+        try {
+          setIsLoading(true);
+          const response = await axios.get(
+            `http://localhost:8000/api/v1/contacts/${contactId}`
+          );
+          const contact = response.data.data; // Adjust based on your API response structure
+          form.reset(contact); // Populate the form with fetched data
+          if (contact.image) {
+            setImagePreview(contact.image); // Set the existing image for preview
+          }
+        } catch (error) {
+          toast.error("Failed to fetch contact details.");
+          console.error(error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchContactData();
+    }
+  }, [contactId, form.reset, isEditMode]);
+
   async function onSubmit(values: ContactFormValues) {
     setIsLoading(true);
     const formData = new FormData();
 
+    // Append form values to FormData
     Object.entries(values).forEach(([key, value]) => {
-      formData.append(key, value);
+      if (value) {
+        // Ensure null or undefined values aren't sent
+        formData.append(key, value);
+      }
     });
 
+    // Append the new image file only if it has been changed
     if (imageFile) {
       formData.append("image", imageFile);
     }
 
     try {
-      const response = await axios.post(
-        "http://localhost:8000/api/v1/contacts",
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
+      let response;
+      // MODIFIED: Conditional API call
+      if (isEditMode) {
+        // UPDATE Request
+        response = await axios.put(
+          `http://localhost:8000/api/v1/contacts/${contactId}`,
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
+        toast.success("Contact has been updated successfully.");
+      } else {
+        // CREATE Request
+        response = await axios.post(
+          "http://localhost:8000/api/v1/contacts",
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
+        toast.success("Contact has been created successfully.");
+      }
 
       console.log("Success:", response.data);
-      toast.success("Contact has been created successfully.");
-      form.reset();
-      setImagePreview(null);
-      setImageFile(null);
+      navigate("/master-data"); // NEW: Navigate back to the list on success
     } catch (error) {
-      console.error("Failed to create contact:", error);
-      // MODIFIED: Use isAxiosError for type-safe error handling
+      console.error("Submission failed:", error);
       if (isAxiosError(error)) {
         const errorMessage =
           error.response?.data?.error || "An unknown server error occurred.";
-        toast.error(`Failed to create contact: ${errorMessage}`);
+        toast.error(`Failed: ${errorMessage}`);
       } else {
         toast.error("An unexpected error occurred.");
       }
@@ -115,6 +160,7 @@ function ContactForm() {
     }
   }
 
+  // ... (handleImageChange and handleUploadClick remain the same)
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -130,19 +176,23 @@ function ContactForm() {
   return (
     <Card className="max-w-4xl mx-auto my-10">
       <CardHeader>
+        {/* MODIFIED: Dynamic title and description */}
         <CardTitle className="text-2xl font-semibold">
-          Contact Information
+          {isEditMode ? "Edit Contact" : "Create New Contact"}
         </CardTitle>
         <CardDescription>
-          Fill out the form to add a new contact.
+          {isEditMode
+            ? "Update the contact's information below."
+            : "Fill out the form to add a new contact."}
         </CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent>
+            {/* ... Form fields are the same, they will be populated by react-hook-form ... */}
+            {/* The rest of your JSX for the form fields goes here unchanged */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="md:col-span-2 grid gap-6">
-                {/* ... other fields like contactName, email ... */}
                 <FormField
                   control={form.control}
                   name="contactName"
@@ -186,17 +236,15 @@ function ContactForm() {
                     </FormItem>
                   )}
                 />
-
-                {/* FIX #3: Correctly implemented the Select component */}
                 <FormField
                   control={form.control}
                   name="type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type</FormLabel> {/* Corrected label */}
+                      <FormLabel>Type</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value} // Use value for controlled component
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -270,8 +318,6 @@ function ContactForm() {
                   />
                 </div>
               </div>
-
-              {/* ... Image Upload Section ... */}
               <div className="md:col-span-1 flex flex-col items-center justify-center gap-4">
                 <input
                   type="file"
@@ -301,9 +347,14 @@ function ContactForm() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-start border-t pt-6 mt-6">
+            {/* MODIFIED: Dynamic button text */}
             <Button type="submit" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoading ? "Submitting..." : "Confirm"}
+              {isLoading
+                ? "Saving..."
+                : isEditMode
+                ? "Save Changes"
+                : "Confirm"}
             </Button>
           </CardFooter>
         </form>

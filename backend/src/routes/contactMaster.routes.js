@@ -9,14 +9,12 @@ import { upload } from "../middleware/multer.middleware.js";
 
 const router = express.Router();
 
-// Existing route for getting all contacts
-router.route("/").get(getAllContacts);
+router.route("/").get(getAllContacts).post(upload.single("image"), createContact);
 
-// 2. Apply the middleware to the POST route
-// It will process one file attached to the 'image' field
-router.route("/").post(upload.single("image"), createContact);
-
-// Existing routes for specific contact
-router.route("/:id").get(getContactById).put(updateContact); // You might want to add upload.single('image') to put() later
+// MODIFIED: Added the multer middleware to the PUT route
+router
+  .route("/:id")
+  .get(getContactById)
+  .put(upload.single("image"), updateContact); // <-- ADD MIDDLEWARE HERE
 
 export default router;

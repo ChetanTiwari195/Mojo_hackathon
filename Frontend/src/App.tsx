@@ -16,6 +16,7 @@ import BillPaymentForm from "./Pages/Payment";
 import BillLedger from "./Pages/Ledger";
 import ProfitLossStatement from "./Pages/PLStatement";
 import BalanceSheet from "./Pages/Balance-sheet";
+import { MasterDataListPage } from "./Pages/MasterDataListPage";
 
 function App() {
   return (
@@ -24,12 +25,17 @@ function App() {
       <DashboardNavbar />
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/master-data" element={<MasterDataListPage />} />
 
-        {/* main table pages */}
-        <Route path="/contact-master" element={<ContactForm />} />
-        <Route path="/product-master" element={<ProductForm />} />
-        <Route path="/tax-master" element={<TaxForm />} />
-        <Route path="/chart-of-accounts" element={<AccountForm />} />
+        {/* Routes for Creating a new contact, product, tax, etc. */}
+        <Route path="/contact-master/create" element={<ContactForm />} />
+        <Route path="/product-master/create" element={<ProductForm />} />
+        <Route path="/tax-master/create" element={<TaxForm />} />
+        <Route path="/chart-of-accounts/create" element={<AccountForm />} />
+
+        {/* Routes for Editing an existing contact or tax */}
+        <Route path="/contact-master/:id/edit" element={<ContactForm />} />
+        <Route path="/tax-master/:id/edit" element={<TaxForm />} />
 
         {/* order pages */}
         <Route path="/order" element={<PurchaseOrderForm />} />
