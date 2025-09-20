@@ -77,10 +77,10 @@ function DashboardNavbar() {
               <NavigationMenuTrigger>Purchase</NavigationMenuTrigger>
               <NavigationMenuContent>
                 <ul className="grid w-[400px] gap-3 p-4 md:w-[250px] lg:w-[300px]">
-                  <ListItem href="/purchase-order" title="Purchase Order">
+                  <ListItem href="/order" title="Purchase Order">
                     Create and manage purchase orders.
                   </ListItem>
-                  <ListItem href="/purchase-bill" title="Purchase Bill">
+                  <ListItem href="/bill" title="Purchase Bill">
                     Record and track supplier bills.
                   </ListItem>
                   <ListItem href="/payment" title="Payment">
@@ -95,13 +95,13 @@ function DashboardNavbar() {
               <NavigationMenuTrigger>Sale</NavigationMenuTrigger>
               <NavigationMenuContent>
                 <ul className="grid w-[400px] gap-3 p-4 md:w-[250px] lg:w-[300px]">
-                  <ListItem href="/sale-order" title="Sale Order">
+                  <ListItem href="/order" title="Sale Order">
                     Manage customer sales orders.
                   </ListItem>
-                  <ListItem href="/sale-invoice" title="Sale Invoice">
+                  <ListItem href="/bill" title="Sale Invoice">
                     Create and send invoices to customers.
                   </ListItem>
-                  <ListItem href="/receipt" title="Receipt">
+                  <ListItem href="/payment" title="Receipt">
                     Record incoming payments and receipts.
                   </ListItem>
                 </ul>
@@ -113,18 +113,38 @@ function DashboardNavbar() {
               <NavigationMenuTrigger>Report</NavigationMenuTrigger>
               <NavigationMenuContent>
                 <ul className="grid w-[400px] gap-3 p-4 md:w-[250px] lg:w-[300px]">
-                  <ListItem href="/profit-loss" title="Profit & Loss">
+                  <ListItem href="profit-loss-statement" title="Profit & Loss">
                     View your income statement.
                   </ListItem>
                   <ListItem href="/balance-sheet" title="Balance Sheet">
                     Analyze your company's financial position.
                   </ListItem>
-                  <ListItem href="/stock-statement" title="Stock Statement">
+                  <ListItem href="/ledger" title="SLedger">
                     Track inventory levels and value.
                   </ListItem>
                 </ul>
               </NavigationMenuContent>
             </NavigationMenuItem>
+
+            {/* <NavigationMenuItem>
+              <NavigationMenuTrigger>Master Data</NavigationMenuTrigger>
+              <NavigationMenuContent>
+                <ul className="grid w-[400px] gap-3 p-4 md:w-[250px] lg:w-[300px]">
+                  <ListItem href="/contact-master" title="Contact Master">
+                    
+                  </ListItem>
+                  <ListItem href="/product-master" title="Product Master">
+                    
+                  </ListItem>
+                  <ListItem href="/tax-master" title="Tax Master">
+                    
+                  </ListItem>
+                  <ListItem href="/chart-of-accounts" title="Chart of Accounts">
+                   
+                  </ListItem>
+                </ul>
+              </NavigationMenuContent>
+            </NavigationMenuItem> */}
           </NavigationMenuList>
         </NavigationMenu>
       </nav>
@@ -174,7 +194,9 @@ function DashboardNavbar() {
             <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuItem>Support</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={()=>handleLogout()}>Logout</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleLogout()}>
+              Logout
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
