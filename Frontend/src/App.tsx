@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import Dashboard from "./Pages/Home";
 import { LoginForm } from "./Pages/Login";
 import { SignupForm } from "./Pages/SignUp";
+import CreateUserForm from "./Pages/CreateUser";
 import { DashboardNavbar } from "./components/ui/navbar";
 import ContactForm from "./Pages/ContactMaster";
 import ProductForm from "./Pages/Product-Master";
@@ -46,6 +47,7 @@ function App() {
         {/* login/signup pages */}
         <Route path="/login" element={<LoginForm />} />
         <Route path="/signup" element={<SignupForm />} />
+        <Route path="/create" element={<CreateUserForm />} />
       </Routes>
     </div>
   );

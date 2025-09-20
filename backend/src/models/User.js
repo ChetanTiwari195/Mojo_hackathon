@@ -1,5 +1,5 @@
-import { DataTypes } from "sequelize";
-import { sequelize } from "../db/index.js"; // your sequelize connection
+import { DataTypes, Sequelize } from "sequelize"; // Make sure to import Sequelize for DataTypes.NOW
+import { sequelize } from "../db/index.js";
 
 const User = sequelize.define("User", {
   id: {
@@ -20,10 +20,6 @@ const User = sequelize.define("User", {
     allowNull: false,
     unique: true
   },
-  mobile: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
   password: {
     type: DataTypes.STRING,
     allowNull: false
@@ -31,13 +27,18 @@ const User = sequelize.define("User", {
   profile_image: {
     type: DataTypes.STRING,
     allowNull: true
+  },
+  // Add this block to explicitly define the column and its default value
+  created_at: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
   }
 }, {
   tableName: "users",
-  timestamps: true,          // ✅ enable timestamps
-  createdAt: "created_at",   // ✅ map to your column
-  updatedAt: false           // ✅ disable updatedAt since your table doesn’t have it
+  timestamps: true,
+  createdAt: "created_at", // This mapping is still important
+  updatedAt: false         // Keep this as you don't have an updatedAt column
 });
-
 
 export default User;

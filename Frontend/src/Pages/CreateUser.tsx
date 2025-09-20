@@ -88,7 +88,6 @@ function CreateUserForm() {
       loading: "Creating user...",
       success: (response) => {
         form.reset();
-        // Optionally navigate away after success, e.g., to a user list page
         // navigate("/users");
         return response.data.message;
       },
