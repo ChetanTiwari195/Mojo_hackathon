@@ -1,5 +1,6 @@
 import React from "react";
-import { CircleUser, Menu, Package2, Search } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { CircleUser, Menu, Package2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   NavigationMenu,
@@ -27,6 +27,7 @@ const ListItem = React.forwardRef<
   React.ElementRef<"a">,
   React.ComponentPropsWithoutRef<"a">
 >(({ className, title, children, ...props }, ref) => {
+
   return (
     <li>
       <NavigationMenuLink asChild>
@@ -51,6 +52,13 @@ ListItem.displayName = "ListItem";
 
 // Main Dashboard Navbar Component
 function DashboardNavbar() {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    navigate("/login");
+  };
+
   return (
     <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 z-50">
       {/* Desktop Navigation */}
@@ -152,17 +160,7 @@ function DashboardNavbar() {
       </Sheet>
 
       {/* Right side of Navbar */}
-      <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
-        <form className="ml-auto flex-1 sm:flex-initial">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search products..."
-              className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px]"
-            />
-          </div>
-        </form>
+      <div className=" gap-4 md:ml-auto md:gap-2 lg:gap-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="icon" className="rounded-full">
@@ -176,7 +174,7 @@ function DashboardNavbar() {
             <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuItem>Support</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Logout</DropdownMenuItem>
+            <DropdownMenuItem onClick={()=>handleLogout()}>Logout</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

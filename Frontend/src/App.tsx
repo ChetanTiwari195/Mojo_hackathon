@@ -1,19 +1,26 @@
 import "./App.css";
 import { Route, Routes } from "react-router-dom";
+import { Toaster } from "@/components/ui/sonner";
 import Dashboard from "./Pages/Home";
 import { LoginForm } from "./Pages/Login";
 import { SignupForm } from "./Pages/SignUp";
+import CreateUserForm from "./Pages/CreateUser";
 import { DashboardNavbar } from "./components/ui/navbar";
-import ContactForm from "./Pages/Contact-Master";
+import ContactForm from "./Pages/ContactMaster";
 import ProductForm from "./Pages/Product-Master";
-import TaxForm from "./Pages/Tax-Master";
-import AccountForm from "./Pages/Chart-Of-Accounts";
-import PurchaseOrderForm from "./Pages/PurchaseOrderForm";
-import VendorBillForm from "./Pages/Vendor-Bill";
+import TaxForm from "./Pages/TaxMaster";
+import AccountForm from "./Pages/ChartOfAccounts";
+import PurchaseOrderForm from "./Pages/Order";
+import VendorBillForm from "./Pages/Bill";
+import BillPaymentForm from "./Pages/Payment";
+import BillLedger from "./Pages/Ledger";
+import ProfitLossStatement from "./Pages/PLStatement";
+import BalanceSheet from "./Pages/Balance-sheet";
 
 function App() {
   return (
     <div>
+      <Toaster richColors position="top-right" />
       <DashboardNavbar />
       <Routes>
         <Route path="/" element={<Dashboard />} />
@@ -25,12 +32,22 @@ function App() {
         <Route path="/chart-of-accounts" element={<AccountForm />} />
 
         {/* order pages */}
-        <Route path="/purchase-order" element={<PurchaseOrderForm />} />
-        <Route path="/vendor-bill" element={<VendorBillForm />} />
+        <Route path="/order" element={<PurchaseOrderForm />} />
+        <Route path="/bill" element={<VendorBillForm />} />
+        <Route path="/payment" element={<BillPaymentForm />} />
+
+        {/* ledgers */}
+        <Route path="/ledger" element={<BillLedger />} />
+        <Route
+          path="/profit-loss-statement"
+          element={<ProfitLossStatement />}
+        />
+        <Route path="/balance-sheet" element={<BalanceSheet />} />
 
         {/* login/signup pages */}
         <Route path="/login" element={<LoginForm />} />
         <Route path="/signup" element={<SignupForm />} />
+        <Route path="/create" element={<CreateUserForm />} />
       </Routes>
     </div>
   );

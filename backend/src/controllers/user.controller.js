@@ -6,22 +6,26 @@ import User from "../models/User.js";
 // Register User
 export const userRegister = async (req, res) => {
   console.log(req.body);
-  const { name, role, email, mobile = "", password, profile_image = "" } = req.body;
+  const { name, role, email, password,password2, profile_image = "" } = req.body;
 
   if (!name || !role || !email || !password) {
     return res.status(400).json({ message: "Name, role, email, and password are required." });
+  }
+
+  if (password !== password2) {
+    return res.status(400).json({ message: "Passwords do not match." });
   }
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const query = `
-      INSERT INTO users (name, role, email, mobile, password)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO users (name, role, email, password)
+      VALUES (?, ?, ?, ?)
     `;
 
     await sequelize.query(query, {
-      replacements: [name, role, email, mobile, hashedPassword],
+      replacements: [name, role, email, hashedPassword],
       type: sequelize.QueryTypes.INSERT
     });
 
