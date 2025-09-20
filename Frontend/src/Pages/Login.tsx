@@ -27,7 +27,7 @@ import {
 
 // 1. Corrected Zod schema for email validation
 const formSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email." }),
+  email: z.email({ message: "Please enter a valid email." }),
   password: z.string().min(1, { message: "Password is required." }),
 });
 
@@ -52,9 +52,6 @@ type ApiErrorResponse = {
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  // In a real app, you would typically use a state management library (like Zustand or Redux)
-  // or React Context to store the user's authentication state globally.
-  // For this example, we'll just log it and navigate.
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(formSchema),
@@ -69,7 +66,6 @@ export function LoginForm() {
     setIsLoading(true);
 
     const apiCall = axios.post<ApiLoginResponse>(
-      // NOTE: Replace with your actual API base URL
       "http://localhost:8000/api/v1/login",
       values
     );
@@ -78,14 +74,10 @@ export function LoginForm() {
       loading: "Logging in...",
       success: (response) => {
         const { token, user, message } = response.data;
-
-        // In a real application, you would store the token securely.
-        // For example, in an HttpOnly cookie (handled by the backend)
-        // or in memory. localStorage is okay for simple cases but less secure.
         localStorage.setItem("accessToken", token);
         localStorage.setItem("user", JSON.stringify(user));
 
-        navigate("/dashboard"); // Redirect to a protected route on success
+        navigate("/"); 
         return message;
       },
       error: (error: AxiosError<ApiErrorResponse>) => {

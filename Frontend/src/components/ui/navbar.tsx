@@ -1,5 +1,6 @@
 import React from "react";
-import { CircleUser, Menu, Package2, Search } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { CircleUser, Menu, Package2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   NavigationMenu,
@@ -27,6 +27,7 @@ const ListItem = React.forwardRef<
   React.ElementRef<"a">,
   React.ComponentPropsWithoutRef<"a">
 >(({ className, title, children, ...props }, ref) => {
+
   return (
     <li>
       <NavigationMenuLink asChild>
@@ -51,6 +52,13 @@ ListItem.displayName = "ListItem";
 
 // Main Dashboard Navbar Component
 function DashboardNavbar() {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    navigate("/login");
+  };
+
   return (
     <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 z-50">
       {/* Desktop Navigation */}
@@ -166,7 +174,7 @@ function DashboardNavbar() {
             <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuItem>Support</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Logout</DropdownMenuItem>
+            <DropdownMenuItem onClick={()=>handleLogout()}>Logout</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
