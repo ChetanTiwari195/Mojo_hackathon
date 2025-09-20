@@ -1,16 +1,12 @@
 import { Sequelize } from "sequelize";
+import { DB_NAME, DB_USER, DB_PASSWORD, DB_HOST } from "./credential.js";
 
 // Use environment variables for host, user, password, and database name
-const sequelize = new Sequelize(
-  "mojo-DB",    // database name
-  "root",       // username
-  "Atul#2002",       // password
-  {
-    host: process.env.DB_HOST || "localhost",
-    dialect: "mysql",
-    logging: false
-  }
-);
+const sequelize = new Sequelize(DB_NAME, DB_USER, DB_PASSWORD, {
+  host: DB_HOST,
+  dialect: "mysql",
+  logging: false,
+});
 
 const connectDB = async () => {
   try {
