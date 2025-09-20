@@ -1,35 +1,39 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import "./App.css";
+import { Route, Routes } from "react-router-dom";
+import Dashboard from "./Pages/Home";
+import { LoginForm } from "./Pages/Login";
+import { SignupForm } from "./Pages/SignUp";
+import { DashboardNavbar } from "./components/ui/navbar";
+import ContactForm from "./Pages/Contact-Master";
+import ProductForm from "./Pages/Product-Master";
+import TaxForm from "./Pages/Tax-Master";
+import AccountForm from "./Pages/Chart-Of-Accounts";
+import PurchaseOrderForm from "./Pages/PurchaseOrderForm";
+import VendorBillForm from "./Pages/Vendor-Bill";
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div>
+      <DashboardNavbar />
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+
+        {/* main table pages */}
+        <Route path="/contact-master" element={<ContactForm />} />
+        <Route path="/product-master" element={<ProductForm />} />
+        <Route path="/tax-master" element={<TaxForm />} />
+        <Route path="/chart-of-accounts" element={<AccountForm />} />
+
+        {/* order pages */}
+        <Route path="/purchase-order" element={<PurchaseOrderForm />} />
+        <Route path="/vendor-bill" element={<VendorBillForm />} />
+
+        {/* login/signup pages */}
+        <Route path="/login" element={<LoginForm />} />
+        <Route path="/signup" element={<SignupForm />} />
+      </Routes>
+    </div>
+  );
 }
 
-export default App
+export default App;
