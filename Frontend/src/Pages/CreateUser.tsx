@@ -1,6 +1,10 @@
+import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useNavigate } from "react-router-dom";
+import axios, { AxiosError } from "axios";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -28,54 +32,86 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// --- Zod Validation Schema for the Create User Form ---
+// ✅ 1. Schema updated to match backend model and corrected Zod enum syntax
 const userFormSchema = z
   .object({
     name: z.string().min(3, "Name must be at least 3 characters."),
-    loginId: z.string().min(4, "Login ID must be at least 4 characters."),
-    emailId: z.string().email("Please enter a valid email address."),
-    role: z.enum(["admin", "manager", "employee"], {
-      required_error: "Please select a role for the user.",
-    }),
+    email: z.string().email("Please enter a valid email address."),
+    // Values capitalized to match backend ENUM ('Admin', 'Invoicing', 'Contact')
+    role: z.enum(["Admin", "Invoicing", "Contact"]),
     password: z.string().min(8, "Password must be at least 8 characters long."),
-    confirmPassword: z.string(),
+    password2: z.string(),
   })
-  .refine((data) => data.password === data.confirmPassword, {
+  .refine((data) => data.password === data.password2, {
     message: "Passwords do not match.",
-    path: ["confirmPassword"], // path of error
+    path: ["password2"],
   });
 
-// Infer the TypeScript type from the Zod schema
 type UserFormValues = z.infer<typeof userFormSchema>;
 
-// --- The Create User Form Component ---
+// Define types for API responses for type safety
+type ApiResponse = {
+  message: string;
+};
+
+type ApiErrorResponse = {
+  message: string;
+};
+
 function CreateUserForm() {
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
+    // Default role set to a valid enum value
     defaultValues: {
       name: "",
-      loginId: "",
-      emailId: "",
-      role: undefined,
+      email: "",
+      role: "Contact",
       password: "",
-      confirmPassword: "",
+      password2: "",
     },
   });
 
-  function onSubmit(values: UserFormValues) {
-    console.log("Create User Form Submitted:", values);
-    // In a real app, you wouldn't use alert. This is for demonstration.
-    alert("User created successfully! Check the console for the form data.");
-    form.reset();
+  // ✅ 2. onSubmit function now handles the API call, loading state, and toasts
+  async function onSubmit(values: UserFormValues) {
+    setIsLoading(true);
+
+    const apiCall = axios.post<ApiResponse>(
+      // NOTE: Replace with your actual API base URL
+      "http://localhost:8000/api/v1/register",
+      values
+    );
+
+    toast.promise(apiCall, {
+      loading: "Creating user...",
+      success: (response) => {
+        form.reset();
+        // Optionally navigate away after success, e.g., to a user list page
+        // navigate("/users");
+        return response.data.message;
+      },
+      error: (error: AxiosError<ApiErrorResponse>) => {
+        return error.response?.data?.message || "Failed to create user.";
+      },
+      finally: () => {
+        setIsLoading(false);
+      },
+    });
   }
 
   return (
-    <div className="max-w-4xl mx-auto my-10 font-sans">
-      {/* --- Top Navigation Buttons --- */}
+    <div className="max-w-4xl mx-auto my-10 font-sans p-4">
+      {/* ✅ 3. Navigation buttons are now functional */}
       <div className="flex items-center justify-end mb-4">
         <div className="flex gap-2">
-          <Button variant="outline">Home</Button>
-          <Button variant="outline">Back</Button>
+          <Button variant="outline" onClick={() => navigate("/")}>
+            Home
+          </Button>
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            Back
+          </Button>
         </div>
       </div>
 
@@ -90,7 +126,6 @@ function CreateUserForm() {
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* --- Name --- */}
                 <FormField
                   control={form.control}
                   name="name"
@@ -98,14 +133,16 @@ function CreateUserForm() {
                     <FormItem>
                       <FormLabel>Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., John Doe" {...field} />
+                        <Input
+                          placeholder="e.g., Jane Doe"
+                          {...field}
+                          disabled={isLoading}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                {/* --- Role --- */}
                 <FormField
                   control={form.control}
                   name="role"
@@ -115,6 +152,7 @@ function CreateUserForm() {
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}
+                        disabled={isLoading}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -122,32 +160,34 @@ function CreateUserForm() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="manager">Manager</SelectItem>
-                          <SelectItem value="employee">Employee</SelectItem>
+                          <SelectItem value="Admin">Admin</SelectItem>
+                          <SelectItem value="Invoicing">Invoicing</SelectItem>
+                          <SelectItem value="Contact">Contact</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                {/* --- Login ID --- */}
                 <FormField
                   control={form.control}
-                  name="loginId"
+                  name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Login id</FormLabel>
+                      <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., johndoe99" {...field} />
+                        <Input
+                          type="email"
+                          placeholder="e.g., jane.doe@example.com"
+                          {...field}
+                          disabled={isLoading}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                {/* --- Password --- */}
+                <div /> {/* Empty div for grid alignment */}
                 <FormField
                   control={form.control}
                   name="password"
@@ -159,35 +199,16 @@ function CreateUserForm() {
                           type="password"
                           placeholder="••••••••"
                           {...field}
+                          disabled={isLoading}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                {/* --- Email ID --- */}
                 <FormField
                   control={form.control}
-                  name="emailId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email id</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="e.g., john.doe@example.com"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* --- Re-Enter Password --- */}
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
+                  name="password2"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Re-Enter Password</FormLabel>
@@ -196,6 +217,7 @@ function CreateUserForm() {
                           type="password"
                           placeholder="••••••••"
                           {...field}
+                          disabled={isLoading}
                         />
                       </FormControl>
                       <FormMessage />
@@ -204,13 +226,15 @@ function CreateUserForm() {
                 />
               </div>
             </CardContent>
-
             <CardFooter className="flex justify-start gap-2 border-t pt-6 mt-6">
-              <Button type="submit">Create</Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Creating..." : "Create"}
+              </Button>
               <Button
                 variant="outline"
                 type="button"
                 onClick={() => form.reset()}
+                disabled={isLoading}
               >
                 Cancel
               </Button>

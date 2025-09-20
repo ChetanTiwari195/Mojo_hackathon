@@ -1,5 +1,6 @@
 import "./App.css";
 import { Route, Routes } from "react-router-dom";
+import { Toaster } from "@/components/ui/sonner";
 import Dashboard from "./Pages/Home";
 import { LoginForm } from "./Pages/Login";
 import { SignupForm } from "./Pages/SignUp";
@@ -18,6 +19,7 @@ import BalanceSheet from "./Pages/Balance-sheet";
 function App() {
   return (
     <div>
+      <Toaster richColors position="top-right" />
       <DashboardNavbar />
       <Routes>
         <Route path="/" element={<Dashboard />} />
