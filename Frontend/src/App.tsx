@@ -36,8 +36,9 @@ function App() {
         <Route path="/tax-master/create" element={<TaxForm />} />
         <Route path="/chart-of-accounts/create" element={<AccountForm />} />
 
-        {/* Routes for Editing an existing contact or tax */}
+        {/* Routes for Editing an existing contact, product, or tax */}
         <Route path="/contact-master/:id/edit" element={<ContactForm />} />
+        <Route path="/product-master/:id/edit" element={<ProductForm />} />
         <Route path="/tax-master/:id/edit" element={<TaxForm />} />
 
         {/* order pages */}
