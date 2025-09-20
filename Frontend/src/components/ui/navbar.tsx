@@ -126,7 +126,7 @@ function DashboardNavbar() {
               </NavigationMenuContent>
             </NavigationMenuItem>
 
-            {/* <NavigationMenuItem>
+            <NavigationMenuItem>
               <NavigationMenuTrigger>Master Data</NavigationMenuTrigger>
               <NavigationMenuContent>
                 <ul className="grid w-[400px] gap-3 p-4 md:w-[250px] lg:w-[300px]">
@@ -144,7 +144,7 @@ function DashboardNavbar() {
                   </ListItem>
                 </ul>
               </NavigationMenuContent>
-            </NavigationMenuItem> */}
+            </NavigationMenuItem>
           </NavigationMenuList>
         </NavigationMenu>
       </nav>
