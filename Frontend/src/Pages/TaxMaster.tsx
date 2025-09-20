@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom"; // NEW: Import hooks
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,98 +27,110 @@ import {
 } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
-// --- Zod Validation Schema ---
-// MODIFIED: Added 'both' to align with the backend model
+// Zod schema remains the same
 const taxFormSchema = z.object({
   taxName: z.string().min(3, "Tax name must be at least 3 characters."),
-  taxComputation: z.enum(["percentage", "fixed"], {
-  invalid_type_error: "You must select a computation type.", // This is correct
-}),
-  taxFor: z.enum(["purchase", "sales", "both"], {
-    // Added "both"
+  computationMethod: z.enum(["percentage", "fixed"], {
+    invalid_type_error: "You must select a computation type.",
+  }),
+  taxScope: z.enum(["purchase", "sales", "both"], {
     required_error: "You must select the tax scope.",
   }),
-  value: z.coerce.number().positive("Value must be a positive number."), // Use coerce for better input handling
+  value: z.coerce.number().positive("Value must be a positive number."),
 });
 
 type TaxFormValues = z.infer<typeof taxFormSchema>;
 
-// --- The Tax Form Component ---
 function TaxForm() {
-  // NEW: State to manage loading during form submission
+  const { id: taxId } = useParams(); // NEW: Get ID from URL
+  const navigate = useNavigate(); // NEW: Hook for navigation
+  const isEditMode = Boolean(taxId);
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const form = useForm<TaxFormValues>({
     resolver: zodResolver(taxFormSchema),
     defaultValues: {
       taxName: "",
-      taxComputation: "percentage",
-      taxFor: "sales", // Default to 'sales'
-      value: undefined, // Start with no value
+      computationMethod: "percentage",
+      taxScope: "sales",
+      value: undefined,
     },
   });
 
-  const taxComputationType = form.watch("taxComputation");
+  // NEW: useEffect to fetch data in edit mode
+  useEffect(() => {
+    if (isEditMode) {
+      const fetchTaxData = async () => {
+        setIsLoading(true);
+        try {
+          const response = await axios.get(
+            `http://localhost:8000/api/v1/taxes/${taxId}`
+          );
+          const taxData = response.data.data;
+          form.reset(taxData); // Populate form with fetched data
+        } catch (error) {
+          toast.error("Failed to fetch tax details.");
+          console.error(error);
+          navigate("/master-data"); // Redirect if tax not found
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchTaxData();
+    }
+  }, [isEditMode, taxId, form, navigate]);
 
-  // MODIFIED: onSubmit function now handles the API call
+  const computationMethod = form.watch("computationMethod");
+
+  // MODIFIED: onSubmit now handles both create and update
   async function onSubmit(values: TaxFormValues) {
     setIsLoading(true);
 
-    // 1. Map frontend field names to backend model names
-    const payload = {
-      taxName: values.taxName,
-      computationMethod: values.taxComputation, // Map to backend name
-      taxScope: values.taxFor, // Map to backend name
-      value: values.value,
-    };
-
     try {
-      // 2. Make the POST request with axios
-      const response = await axios.post(
-        "http://localhost:8000/api/v1/taxes", // Adjust URL if needed
-        payload
-      );
-
-      toast.success(response.data.message || "Tax created successfully!");
-      form.reset(); // Clear the form on success
+      if (isEditMode) {
+        // --- UPDATE LOGIC ---
+        const response = await axios.put(
+          `http://localhost:8000/api/v1/taxes/${taxId}`,
+          values
+        );
+        toast.success(response.data.message || "Tax updated successfully!");
+      } else {
+        // --- CREATE LOGIC ---
+        const response = await axios.post(
+          "http://localhost:8000/api/v1/taxes",
+          values
+        );
+        toast.success(response.data.message || "Tax created successfully!");
+      }
+      navigate("/master-data"); // Navigate to the list page on success
     } catch (error) {
-      console.error("Failed to create tax:", error);
-      // 3. Provide type-safe error handling
+      console.error("Failed to save tax:", error);
       if (isAxiosError(error)) {
         const errorMessage =
           error.response?.data?.error || "An unknown server error occurred.";
-        toast.error(`Failed to create tax: ${errorMessage}`);
+        toast.error(`Failed: ${errorMessage}`);
       } else {
         toast.error("An unexpected error occurred.");
       }
     } finally {
-      setIsLoading(false); // Re-enable the form
+      setIsLoading(false);
     }
   }
 
   return (
-    <div className="max-w-2xl mx-auto my-10 font-sans">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex gap-2">
-          <Button variant="outline">New</Button>
-          <Button onClick={form.handleSubmit(onSubmit)}>Confirm</Button>
-          <Button variant="outline">Archived</Button>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline">Home</Button>
-          <Button variant="outline">Back</Button>
-        </div>
-      </div>
-
+    <div className="max-w-2xl mx-auto my-10">
       <Card>
         <CardHeader>
-          <CardTitle>Tax Configuration</CardTitle>
+          {/* DYNAMIC UI */}
+          <CardTitle>{isEditMode ? "Edit Tax" : "Create New Tax"}</CardTitle>
           <CardDescription>
-            Create and manage tax rates for sales and purchases.
+            {isEditMode
+              ? "Update the details for this tax."
+              : "Configure a new tax rate for sales and purchases."}
           </CardDescription>
         </CardHeader>
         <Form {...form}>
-          {/* The form now calls the new async onSubmit function */}
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="grid gap-6">
               {/* --- Tax Name --- */}
@@ -138,14 +151,14 @@ function TaxForm() {
               {/* --- Tax Computation --- */}
               <FormField
                 control={form.control}
-                name="taxComputation"
+                name="computationMethod"
                 render={({ field }) => (
                   <FormItem className="space-y-3">
                     <FormLabel>Tax Computation</FormLabel>
                     <FormControl>
                       <RadioGroup
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                         className="flex items-center space-x-4"
                       >
                         <FormItem className="flex items-center space-x-2 space-y-0">
@@ -171,18 +184,17 @@ function TaxForm() {
                 )}
               />
 
-              {/* --- Tax Scope (was Tax For) --- */}
-              {/* MODIFIED: Added a third option for "Both" */}
+              {/* --- Tax Scope --- */}
               <FormField
                 control={form.control}
-                name="taxFor"
+                name="taxScope"
                 render={({ field }) => (
                   <FormItem className="space-y-3">
                     <FormLabel>Tax Scope</FormLabel>
                     <FormControl>
                       <RadioGroup
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                         className="flex items-center space-x-4"
                       >
                         <FormItem className="flex items-center space-x-2 space-y-0">
@@ -223,7 +235,7 @@ function TaxForm() {
                       <Input
                         type="number"
                         placeholder={
-                          taxComputationType === "percentage"
+                          computationMethod === "percentage"
                             ? "e.g., 5 for 5%"
                             : "e.g., 50.00 for a fixed amount"
                         }
@@ -236,11 +248,15 @@ function TaxForm() {
               />
             </CardContent>
 
-            <CardFooter className="mt-6">
-              {/* MODIFIED: Button now shows loading state */}
+            <CardFooter className="flex justify-end border-t pt-6 mt-6">
+              {/* DYNAMIC UI */}
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isLoading ? "Saving..." : "Save Tax"}
+                {isLoading
+                  ? "Saving..."
+                  : isEditMode
+                  ? "Save Changes"
+                  : "Create Tax"}
               </Button>
             </CardFooter>
           </form>
