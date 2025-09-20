@@ -14,7 +14,10 @@ const ContactMaster = sequelize.define("ContactMaster", {
   email: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
+    unique: {
+      name: "unique_email_constraint", // Give the unique constraint a specific name
+      msg: "This email is already in use.",
+    },
     validate: {
       isEmail: true,
     },
@@ -32,7 +35,7 @@ const ContactMaster = sequelize.define("ContactMaster", {
     type: DataTypes.STRING,
   },
   profileImage: {
-    type: DataTypes.STRING, // Will store the URL to the image
+    type: DataTypes.STRING,
     allowNull: true,
   },
   type: {

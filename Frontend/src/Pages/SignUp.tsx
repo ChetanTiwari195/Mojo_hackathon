@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useNavigate } from "react-router-dom";
-import axios, { AxiosError } from "axios"; 
+import axios, { AxiosError } from "axios";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -68,7 +68,7 @@ export function SignupForm() {
     defaultValues: {
       name: "",
       email: "",
-      role: "Contact",
+      role: "Invoicing",
       password: "",
       password2: "",
     },
@@ -123,7 +123,7 @@ export function SignupForm() {
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="email"
