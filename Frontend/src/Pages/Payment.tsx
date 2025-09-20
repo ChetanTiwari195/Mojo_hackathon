@@ -138,7 +138,7 @@ function PaymentForm() {
                 })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
-              
+
               {form.formState.errors.date && (
                 <p className="text-xs text-red-500 mt-1">
                   {form.formState.errors.date.message}
@@ -186,7 +186,9 @@ function PaymentForm() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               >
                 <option value="Bank">Bank</option>
-                <option value="Cash" selected>Cash</option>
+                <option value="Cash" selected>
+                  Cash
+                </option>
                 <option value="Card">Card</option>
                 <option value="UPI">UPI</option>
                 <option value="Cheque">Cheque</option>
@@ -212,7 +214,7 @@ function PaymentForm() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="Select partner..."
               />
-              
+
               {form.formState.errors.partner && (
                 <p className="text-xs text-red-500 mt-1">
                   {form.formState.errors.partner.message}
@@ -229,7 +231,6 @@ function PaymentForm() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="Add a note..."
               />
-              
             </div>
           </div>
 
@@ -246,7 +247,7 @@ function PaymentForm() {
                 {...form.register("amount")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-lg font-semibold"
               />
-              
+
               {form.formState.errors.amount && (
                 <p className="text-xs text-red-500 mt-1">
                   {form.formState.errors.amount.message}

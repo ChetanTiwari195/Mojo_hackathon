@@ -79,7 +79,8 @@ export const getContactById = async (req, res) => {
 // NEW: Update a contact by ID
 export const updateContact = asyncHandler(async (req, res) => {
   const { contactId } = req.params;
-  const { contactName, email, phone, type, address, city, state, pincode } = req.body;
+  const { contactName, email, phone, type, address, city, state, pincode } =
+    req.body;
 
   // 1. Find the existing contact to get the old image path
   const contact = await Contact.findById(contactId);
@@ -103,8 +104,12 @@ export const updateContact = asyncHandler(async (req, res) => {
         contactName,
         email,
         phone,
-        type, address, city, state, pincode,
-        image: newImagePath, 
+        type,
+        address,
+        city,
+        state,
+        pincode,
+        image: newImagePath,
       },
     },
     { new: true } // Return the updated document
