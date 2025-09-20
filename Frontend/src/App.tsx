@@ -17,6 +17,9 @@ import BillLedger from "./Pages/Ledger";
 import ProfitLossStatement from "./Pages/PLStatement";
 import BalanceSheet from "./Pages/Balance-sheet";
 import { MasterDataListPage } from "./Pages/MasterDataListPage";
+import CustomerInvoicePortal from "./Pages/CustomerInvoiceViewPortal";
+import PaymentPage from "./Pages/PaymentPage";
+import PaymentSuccessPage from "./Pages/PaymentSuccessPage";
 
 function App() {
   return (
@@ -55,6 +58,9 @@ function App() {
         <Route path="/login" element={<LoginForm />} />
         <Route path="/signup" element={<SignupForm />} />
         <Route path="/create" element={<CreateUserForm />} />
+        <Route path="/customer-invoice-portal" element={<CustomerInvoicePortal/>}/>
+        <Route path="/payment/:id" element={<PaymentPage/>}/>
+        <Route path="/payment-success" element={<PaymentSuccessPage/>}/>
       </Routes>
     </div>
   );
