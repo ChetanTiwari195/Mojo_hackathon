@@ -2,6 +2,7 @@ import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronRight, PlusCircle, XCircle } from "lucide-react";
+import React from "react";
 // import { format } from "date-fns";
 
 // --- Zod Schema for Line Items and the Main Form ---
