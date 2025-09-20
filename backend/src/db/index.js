@@ -1,13 +1,14 @@
 import { Sequelize } from "sequelize";
 
+// Use environment variables for host, user, password, and database name
 const sequelize = new Sequelize(
-  "mojo-DB",       // database name
-  process.env.DB_USER,       // username
-  process.env.DB_PASSWORD,   // password
+  "mojo-DB",    // database name
+  "root",       // username
+  "Atul#2002",       // password
   {
     host: process.env.DB_HOST || "localhost",
-    dialect: "mysql",        // or 'postgres', 'sqlite', 'mssql'
-    logging: false           // disable SQL query logging
+    dialect: "mysql",
+    logging: false
   }
 );
 
