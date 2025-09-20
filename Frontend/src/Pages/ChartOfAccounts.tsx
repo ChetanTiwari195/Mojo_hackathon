@@ -58,11 +58,12 @@ function AccountForm() {
     axios.post("http://localhost:8000/api/v1/accounts",{accountName,accountType})
     .then(res => {
       console.log("✅ Response:", res.data);
+      alert("Account created successfully! Check the console for the form data.");
     })
     .catch(err => {
       console.error("❌ Error:", err);
+      alert("Something went wrong");
     });
-      alert("Account created successfully! Check the console for the form data.");
   }
 
   return (

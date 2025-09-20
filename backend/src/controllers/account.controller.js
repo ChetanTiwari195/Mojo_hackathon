@@ -5,6 +5,8 @@ export const createAccount = async (req, res) => {
   try {
     const { accountName, accountType } = req.body;
 
+    console.log(accountName," ",accountType);
+
     if (!accountName || !accountType) {
       return res
         .status(400)
@@ -22,6 +24,7 @@ export const createAccount = async (req, res) => {
       .status(201)
       .json({ message: "Account created successfully!", data: newAccount });
   } catch (error) {
+    console.log(error);
     res
       .status(500)
       .json({ error: "Failed to create account.", details: error.message });

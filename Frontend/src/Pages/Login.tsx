@@ -1,9 +1,11 @@
+// file: components/LoginForm.js
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useNavigate } from "react-router-dom";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -24,27 +26,17 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { useAuth } from "@/context/AuthContext"; 
 
-// 1. Corrected Zod schema for email validation
+// Zod schema for validation
 const formSchema = z.object({
-  email: z.email({ message: "Please enter a valid email." }),
+  email: z.string().email({ message: "Please enter a valid email." }),
   password: z.string().min(1, { message: "Password is required." }),
 });
 
 type LoginFormValues = z.infer<typeof formSchema>;
 
-// 2. Define types for a more robust API response handling
-type ApiLoginResponse = {
-  message: string;
-  token: string;
-  user: {
-    id: number;
-    name: string;
-    email: string;
-    role: string;
-  };
-};
-
+// Type for the expected API error response
 type ApiErrorResponse = {
   message: string;
 };
@@ -52,6 +44,7 @@ type ApiErrorResponse = {
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth(); // ✅ Get the login function from the context
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(formSchema),
@@ -61,24 +54,19 @@ export function LoginForm() {
     },
   });
 
-  // 3. Implemented onSubmit handler for API integration
+  // This function now calls the context's login method
   async function onSubmit(values: LoginFormValues) {
     setIsLoading(true);
 
-    const apiCall = axios.post<ApiLoginResponse>(
-      "http://localhost:8000/api/v1/login",
-      values
-    );
+    const apiCall = login(values); // ✅ Call the login function from the context
 
     toast.promise(apiCall, {
       loading: "Logging in...",
       success: (response) => {
-        const { token, user, message } = response.data;
-        localStorage.setItem("accessToken", token);
-        localStorage.setItem("user", JSON.stringify(user));
-
-        navigate("/"); 
-        return message;
+        // The context handles setting localStorage and state.
+        // We just navigate and show the success message.
+        navigate("/");
+        return response.data.message;
       },
       error: (error: AxiosError<ApiErrorResponse>) => {
         return error.response?.data?.message || "Invalid credentials.";
