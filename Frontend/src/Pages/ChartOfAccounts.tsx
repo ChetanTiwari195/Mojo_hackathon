@@ -2,6 +2,7 @@ import React from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import axios from "axios";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +33,7 @@ import {
 // --- Zod Validation Schema for the Account Form ---
 const accountFormSchema = z.object({
   accountName: z.string().min(3, "Account name must be at least 3 characters."),
-  accountType: z.enum(["assets", "liabilities", "income", "expense"], {
+  accountType: z.enum(["Assets", "Liabilities", "Income", "Expense"], {
     required_error: "Please select an account type.",
   }),
 });
@@ -51,8 +52,17 @@ function AccountForm() {
   });
 
   function onSubmit(values: AccountFormValues) {
-    console.log("Account Form Submitted:", values);
-    alert("Account created successfully! Check the console for the form data.");
+    console.log("Account Form Submitted:", values.accountName," ",values.accountType);
+    const accountType = values.accountType;
+    const accountName = values.accountName;
+    axios.post("http://localhost:8000/api/v1/accounts",{accountName,accountType})
+    .then(res => {
+      console.log("✅ Response:", res.data);
+    })
+    .catch(err => {
+      console.error("❌ Error:", err);
+    });
+      alert("Account created successfully! Check the console for the form data.");
   }
 
   return (
@@ -113,12 +123,12 @@ function AccountForm() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="assets">Assets</SelectItem>
-                          <SelectItem value="liabilities">
+                          <SelectItem value="Assets">Assets</SelectItem>
+                          <SelectItem value="Liabilities">
                             Liabilities
                           </SelectItem>
-                          <SelectItem value="income">Income</SelectItem>
-                          <SelectItem value="expense">Expense</SelectItem>
+                          <SelectItem value="Income">Income</SelectItem>
+                          <SelectItem value="Expense">Expense</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
