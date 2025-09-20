@@ -1,29 +1,35 @@
 import Product from "../models/product.model.js";
 import Category from "../models/category.model.js";
 
-// Helper function to fetch HSN code (no changes here)
-const fetchHsnCode = async (productName) => {
+// Helper function to fetch HSN code (Corrected)
+const fetchHsnCode = async (productName, productType) => {
   const query = productName.split(" ")[0];
+  // Set category to 'P' for goods or 'S' for services
+  const category = productType === "goods" ? "P" : "S";
+
   try {
     const response = await fetch(
-      `https://services.gst.gov.in/commonservices/hsn/search/qsearch?inputText=${query}&selectedType=byCode&category=null`
+      // Use the corrected URL structure with 'byDesc' and the correct category
+      `https://services.gst.gov.in/commonservices/hsn/search/qsearch?inputText=${query}&selectedType=byDesc&category=${category}`
     );
     if (!response.ok) {
       console.error("Failed to fetch HSN data. Status:", response.status);
       return null;
     }
     const data = await response.json();
-    return data?.data?.[0]?.hsn || null;
+    // The API response uses 'c' for the code, not 'hsn'
+    return data?.data?.[0]?.c || null;
   } catch (error) {
     console.error("Error fetching HSN code:", error);
     return null;
   }
 };
 
-// Create a new product (no changes here, it correctly uses ...req.body)
+// Create a new product
 export const createProduct = async (req, res) => {
   try {
-    const { productName, categoryId, salesPrice, purchasePrice } = req.body;
+    const { productName, productType, categoryId, salesPrice, purchasePrice } =
+      req.body;
 
     if (!productName || !categoryId || !salesPrice || !purchasePrice) {
       return res
@@ -31,7 +37,8 @@ export const createProduct = async (req, res) => {
         .json({ error: "Required product fields are missing." });
     }
 
-    const hsnCode = await fetchHsnCode(productName);
+    // Pass the productType to the fetch function
+    const hsnCode = await fetchHsnCode(productName, productType);
 
     const newProduct = await Product.create({
       ...req.body,
@@ -51,7 +58,6 @@ export const createProduct = async (req, res) => {
 // Get all products, including their Category details
 export const getAllProducts = async (req, res) => {
   try {
-    // The `include` for Tax has been removed.
     const products = await Product.findAll({
       include: [{ model: Category, as: "category" }],
     });

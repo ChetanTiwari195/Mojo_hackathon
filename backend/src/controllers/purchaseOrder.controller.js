@@ -16,6 +16,37 @@ const getNextPoNumber = async () => {
   return "PO" + String(lastNum + 1).padStart(5, "0");
 };
 
+// Add this function to the existing file
+
+export const getPurchaseOrderById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const purchaseOrder = await PurchaseOrder.findByPk(id, {
+      include: [
+        {
+          model: PurchaseOrderLine,
+          as: "lines",
+          include: [{ model: Product }], // Include product details like HSN code
+        },
+        // Add includes for ContactMaster, etc. if needed
+      ],
+    });
+
+    if (!purchaseOrder) {
+      return res.status(404).json({ error: "Purchase Order not found." });
+    }
+
+    res.status(200).json({ data: purchaseOrder });
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        error: "Failed to fetch purchase order.",
+        details: error.message,
+      });
+  }
+};
+
 export const createPurchaseOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
 
