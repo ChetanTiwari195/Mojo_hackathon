@@ -11,8 +11,6 @@ constants.js
 # Dependency directories
 node_modules/
 npm_modules/
-credential.js
-constants.js
 dist
 dist-ssr
 *.local
@@ -27,4 +25,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-/Backend/src/db/credential.js
+/backend/src/db/credential.js

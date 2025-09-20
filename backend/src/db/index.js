@@ -1,5 +1,5 @@
 import { Sequelize } from "sequelize";
-import { DB_NAME, DB_USER, DB_PASSWORD, DB_HOST } from "./credential.js";
+import { DB_NAME, DB_USER, DB_PASSWORD, DB_HOST } from "./constants.js";
 
 // Use environment variables for host, user, password, and database name
 const sequelize = new Sequelize(DB_NAME, DB_USER, DB_PASSWORD, {
