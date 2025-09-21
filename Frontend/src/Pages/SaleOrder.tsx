@@ -73,7 +73,7 @@ function SalesOrderForm() {
       setLoadingData(true);
       try {
         const [customerRes, productRes, taxRes] = await Promise.all([
-          axios.get("http://localhost:8000/api/v1/contact-names?type=customer"),
+          axios.get("http://localhost:8000/api/v1/contacts/names?type=customer"),
           axios.get("http://localhost:8000/api/v1/products"),
           axios.get("http://localhost:8000/api/v1/taxes"),
         ]);
