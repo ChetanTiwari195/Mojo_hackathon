@@ -61,7 +61,9 @@ const getLedger = async (req, res) => {
     // A more robust system would calculate the running balance for each partner.
     // For this demonstration, we'll just return the combined, unsorted list.
     // Sorting by date is crucial for a real ledger.
-    combinedLedger.sort((a, b) => new Date(a.invoiceDate) - new Date(b.invoiceDate));
+    combinedLedger.sort(
+      (a, b) => new Date(a.invoiceDate) - new Date(b.invoiceDate)
+    );
 
     return res.status(200).json(combinedLedger);
   } catch (error) {
