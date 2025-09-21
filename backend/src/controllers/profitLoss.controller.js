@@ -9,10 +9,14 @@ export const getProfitLoss = async (req, res) => {
       where: { paymentType: "receive" },
     });
 
+    console.log(totalSalesReceived)
+
     // Purchases side (money paid to vendors)
     const totalVendorPaid = await VendorPayment.sum("amount", {
       where: { paymentType: "send" },
     });
+
+    console.log(totalVendorPaid)
 
     const profitLoss = (totalSalesReceived || 0) - (totalVendorPaid || 0);
 

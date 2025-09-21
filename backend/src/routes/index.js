@@ -8,9 +8,10 @@ import accountRouter from "./account.routes.js";
 import vendorBillRouter from "./vendorBill.routes.js";
 import vendorPaymentRouter from "./vendorPayment.routes.js";
 import salesRouter from "./sales.routes.js";
-import ledgerRouter from "./ledger.routes.js";
+// import ledgerRouter from "./ledger.routes.js";
 import { getBalanceSheet } from "../controllers/balanceSheet.controller.js"; // Correct import, removing the duplicate.
 import { getDashboardSummary } from "../controllers/dashboard.controller.js";
+import { getCustomerInvoiceById } from "../controllers/customerInvoice.js"
 
 import {
   userRegister,
@@ -23,9 +24,10 @@ import {
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { getLedger } from "../controllers/ledger.controller.js";
 import ledgerRouter from "./ledger.routes.js";
+import { getProfitLoss } from "../controllers/profitLoss.controller.js";
 
-import balanceSheetRouter from "./balance-sheet.routes.js";
-import { getBalanceSheet } from "../controllers/balance-sheet.controller.js";
+// import balanceSheetRouter from "./balance-sheet.routes.js";
+// import { getBalanceSheet } from "../controllers/balance-sheet.controller.js";
 
 const router = Router();
 
@@ -40,7 +42,7 @@ router.use("/purchase-orders", purchaseOrderRouter);
 router.use("/sales", salesRouter);
 router.use("/vendor-bills", vendorBillRouter);
 router.use("/vendor-payments", vendorPaymentRouter);
-router.use("/ledger", ledgerRouter); // Using the dedicated ledger router.
+// router.use("/ledger", ledgerRouter); // Using the dedicated ledger router.
 
 // --- Single-Route Controllers ---
 // These are routes handled directly within this file.
@@ -57,5 +59,6 @@ router.get("/getAllUsers", getAllUsers);
 router.get("/getUser/:id", getUserById);
 router.get("/ledger", ledgerRouter);
 router.get("/balance-sheet", getBalanceSheet);
+router.get("/profit-loss",getProfitLoss)
 
 export default router;

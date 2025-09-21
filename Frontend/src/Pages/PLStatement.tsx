@@ -35,12 +35,12 @@ const fetchProfitLossData = async (): Promise<ProfitLossData> => {
   try {
     const response = await axios.get("http://localhost:8000/api/v1/profit-loss");
 
-    const { income, expenses, netProfit } = response.data;
+    const { sales, purchase, profitLoss } = response.data; // match API
 
     return {
-      income: [{ account: "Sales Income A/c", amount: income }],
-      expenses: [{ account: "Purchase Expense A/c", amount: expenses }],
-      netProfit,
+      income: [{ account: "Sales Income A/c", amount: sales || 0 }],
+      expenses: [{ account: "Purchase Expense A/c", amount: purchase || 0 }],
+      netProfit: profitLoss || 0,
     };
   } catch (error) {
     console.error("API fetch failed:", error);
