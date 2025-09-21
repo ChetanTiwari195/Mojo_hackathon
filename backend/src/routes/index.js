@@ -7,8 +7,15 @@ import categoryRouter from "./category.routes.js";
 import accountRouter from "./account.routes.js"; // 1. Import the new router
 import vendorBillRouter from "./vendorBill.routes.js"; // 1. Import
 import vendorPaymentRouter from "./vendorPayment.routes.js"; // 1. Import
-import { userRegister, userLogin, updateUser, getAllUsers, getUserById, getUserProfile } from "../controllers/user.controller.js";
-import { authMiddleware } from "../middleware/authMiddleware.js"; 
+import {
+  userRegister,
+  userLogin,
+  updateUser,
+  getAllUsers,
+  getUserById,
+  getUserProfile,
+} from "../controllers/user.controller.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 import { getLedger } from "../controllers/ledger.controller.js";
 
 const router = Router();
@@ -21,6 +28,7 @@ router.use("/contacts", contactMasterRouter);
 router.use("/products", productRouter);
 router.use("/taxes", taxRouter);
 router.use("/purchase-orders", purchaseOrderRouter);
+router.use("/sale-order", salesOrderRouter);
 router.use("/vendor-bills", vendorBillRouter);
 router.get("/ledger", getLedger);
 
@@ -28,7 +36,7 @@ router.get("/ledger", getLedger);
 router.post("/register", userRegister);
 router.post("/login", userLogin);
 router.get("/profile", authMiddleware, getUserProfile);
-router.put("/update/:id",updateUser);
-router.get("/getAllUsers",getAllUsers);
-router.get("/getUser/:id",getUserById);
+router.put("/update/:id", updateUser);
+router.get("/getAllUsers", getAllUsers);
+router.get("/getUser/:id", getUserById);
 export default router;
