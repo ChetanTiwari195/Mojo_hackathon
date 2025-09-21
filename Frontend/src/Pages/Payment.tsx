@@ -50,20 +50,37 @@ function PaymentForm() {
   const [journals, setJournals] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Initialize form with safe, empty defaults.
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
       paymentType: "send",
       date: new Date(),
       partnerType: "vendor",
-      partner: billData?.vendorName || "",
-      note: billData
-        ? `Payment for ${billData.billNumber || "Vendor Bill"}`
-        : "",
-      amount: billData?.totalAmount || 0,
-      vendorBillId: billData?.vendorBillId || undefined,
+      partner: "", // Default to an empty string
+      note: "",
+      amount: 0,
+      vendorBillId: undefined,
+      journalId: undefined,
     },
   });
+
+  // Use this effect to populate form values once billData is available.
+  useEffect(() => {
+    if (billData) {
+      form.reset({
+        paymentType: "send",
+        partnerType: "vendor",
+        partner: billData.vendorName,
+        amount: billData.totalAmount,
+        vendorBillId: billData.vendorBillId,
+        date: new Date(),
+        // You can set a default journal here if you wish, e.g., journals[0]?.id
+        journalId: journals.length > 0 ? journals[0].id : undefined,
+        note: `Payment for ${billData.billNumber || "Vendor Bill"}`,
+      });
+    }
+  }, [billData, form, journals]); // Add 'journals' to the dependency array
 
   // Fetch journals (asset accounts) for the dropdown
   useEffect(() => {
@@ -84,23 +101,6 @@ function PaymentForm() {
 
     fetchJournals();
   }, []);
-
-  // Update form values once billData and journals are loaded
-  useEffect(() => {
-    if (billData && journals.length > 0) {
-      form.reset({
-        paymentType: "send",
-        partnerType: "vendor",
-        partner: billData.vendorName,
-        amount: billData.totalAmount,
-        vendorBillId: billData.vendorBillId,
-        date: new Date(),
-        // Set the first journal as the default if it exists
-        journalId: journals[0]?.id || undefined,
-        note: `Payment for ${billData.billNumber || "Vendor Bill"}`,
-      });
-    }
-  }, [billData, form, journals]);
 
   async function onSubmit(values: PaymentFormValues) {
     setIsSubmitting(true);

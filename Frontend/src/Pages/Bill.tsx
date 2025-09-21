@@ -136,48 +136,67 @@ function VendorBillForm() {
     );
   }, [watchedLineItems]);
 
-  async function onSubmit(values: VendorBillFormValues) {
-    console.log("slkfjsdlj");
-    setIsSubmitting(true);
-    setSubmitMessage({ type: "", text: "" });
+ async function onSubmit(values: VendorBillFormValues) {
+   setIsSubmitting(true);
+   setSubmitMessage({ type: "", text: "" });
 
-    const payload = {
-      ...values,
-      billDate: formatDateForInput(values.billDate),
-      dueDate: formatDateForInput(values.dueDate),
-    };
+   // Calculate the total amount before sending the payload
+   const totals = values.lineItems.reduce(
+     (acc, item) => {
+       const untaxedAmount = (item.quantity || 0) * (item.unitPrice || 0);
+       const taxAmount = untaxedAmount * ((item.taxRate || 0) / 100);
+       acc.total += untaxedAmount + taxAmount;
+       return acc;
+     },
+     { total: 0 }
+   );
 
-    console.log("Submitting Vendor Bill:", payload);
+   const payload = {
+     ...values,
+     billDate: formatDateForInput(values.billDate),
+     dueDate: formatDateForInput(values.dueDate),
+     totalAmount: totals.total, // Ensure totalAmount is part of the payload
+   };
 
-    try {
-      const response = await axios.post(
-        "http://localhost:8000/api/v1/vendor-bills",
-        payload
-      );
+   try {
+     const response = await axios.post(
+       "http://localhost:8000/api/v1/vendor-bills",
+       payload
+     );
 
-      const result = response.data;
+     const result = response.data.data; // Assuming your backend returns the created bill object under a 'data' key
 
-      setSubmitMessage({
-        type: "success",
-        text: result.message || "Vendor Bill created successfully!",
-      });
-      form.reset();
-      navigate("/payment");
-    } catch (error: any) {
-      console.log(error);
-      const errorMessage =
-        error.response?.data?.details ||
-        error.response?.data?.error ||
-        error.message ||
-        "An unknown error occurred.";
-      setSubmitMessage({
-        type: "error",
-        text: `Submission failed: ${errorMessage}`,
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
+     setSubmitMessage({
+       type: "success",
+       text: "Vendor Bill created successfully!",
+     });
+
+     // Navigate to the payment page and pass the newly created bill data
+     navigate("/payment", {
+       state: {
+         billData: {
+           vendorBillId: result.id,
+           billNumber: result.billNumber,
+           vendorName: result.vendorName,
+           totalAmount: result.totalAmount, // This might be the culprit
+         },
+       },
+     });
+   } catch (error: any) {
+     const errorMessage =
+       error.response?.data?.details ||
+       error.response?.data?.error ||
+       error.message ||
+       "An unknown error occurred.";
+     setSubmitMessage({
+       type: "error",
+       text: `Submission failed: ${errorMessage}`,
+     });
+     console.error(error);
+   } finally {
+     setIsSubmitting(false);
+   }
+ }
 
   return (
     <div className="max-w-7xl mx-auto my-10 font-sans p-4 bg-gray-50">
