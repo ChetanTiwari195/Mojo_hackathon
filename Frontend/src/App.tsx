@@ -8,7 +8,7 @@ import Dashboard from "./Pages/Home";
 import { LoginForm } from "./Pages/Login";
 import { SignupForm } from "./Pages/SignUp";
 import CreateUserForm from "./Pages/CreateUser";
-import { DashboardNavbar } from "./components/ui/navbar";
+// import { DashboardNavbar } from "./components/ui/navbar";
 import ContactForm from "./Pages/ContactMaster";
 import ProductForm from "./Pages/Product-Master";
 import TaxForm from "./Pages/TaxMaster";
@@ -23,6 +23,7 @@ import { MasterDataListPage } from "./Pages/MasterDataListPage";
 import CustomerInvoicePortal from "./Pages/CustomerInvoiceViewPortal";
 import PaymentPage from "./Pages/PaymentPage";
 import PaymentSuccessPage from "./Pages/PaymentSuccessPage";
+import SalesOrderForm from "./Pages/SaleOrder";
 
 function App() {
   return (
