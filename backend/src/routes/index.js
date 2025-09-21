@@ -23,6 +23,7 @@ import ledgerRouter from "./ledger.routes.js";
 
 import balanceSheetRouter from "./balance-sheet.routes.js";
 import { getBalanceSheet } from "../controllers/balance-sheet.controller.js";
+import { getProfitLoss } from "../controllers/profitLoss.controller.js";
 
 const router = Router();
 
@@ -48,5 +49,6 @@ router.get("/getAllUsers", getAllUsers);
 router.get("/getUser/:id", getUserById);
 router.get("/ledger", ledgerRouter);
 router.get("/balance-sheet", getBalanceSheet);
+router.get("/profit-loss", getProfitLoss);
 
 export default router;
