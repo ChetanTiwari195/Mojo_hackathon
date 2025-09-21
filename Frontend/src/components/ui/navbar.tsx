@@ -101,10 +101,10 @@ function DashboardNavbar() {
                   <ListItem href="/sale-order" title="Sale Order">
                     Manage customer sales orders.
                   </ListItem>
-                  <ListItem href="/bill" title="Sale Invoice">
+                  <ListItem href="/salesbill" title="Sale Invoice">
                     Create and send invoices to customers.
                   </ListItem>
-                  <ListItem href="/payment" title="Receipt">
+                  <ListItem href="/salespayment" title="Receipt">
                     Record incoming payments and receipts.
                   </ListItem>
                 </ul>

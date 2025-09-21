@@ -2,10 +2,18 @@ import React, { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, PlusCircle, XCircle } from "lucide-react";
+import {
+  PlusCircle,
+  XCircle,
+  Loader2,
+  Home as HomeIcon,
+} from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import {
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
 
 // --- Zod Schema for Line Items and the Main Form ---
 const lineItemSchema = z.object({
@@ -15,20 +23,20 @@ const lineItemSchema = z.object({
   taxRate: z.coerce.number().min(0, "Tax cannot be negative.").max(100),
 });
 
-const salesOrderSchema = z.object({
-  soNumber: z.string().optional(),
-  soDate: z.date({
-    message: "A sales order date is required.",
+const purchaseOrderSchema = z.object({
+  poNumber: z.string().optional(),
+  poDate: z.date({
+    message: "A PO date is required.",
   }),
-  customerId: z.string().min(1, "Customer is required."),
+  vendorId: z.string().min(1, "Vendor is required."),
   reference: z.string().optional(),
   lineItems: z.array(lineItemSchema).min(1, "Please add at least one product."),
 });
 
-type SalesOrderFormValues = z.infer<typeof salesOrderSchema>;
+type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 
 // --- API Interfaces ---
-interface Customer {
+interface Vendor {
   id: number;
   contactName: string;
 }
@@ -36,8 +44,8 @@ interface Customer {
 interface Product {
   id: number;
   productName: string;
-  salesPrice: number;
-  salesTax: number;
+  purchasePrice: number;
+  purchaseTax: number;
   hsnCode?: string;
 }
 
@@ -47,21 +55,22 @@ interface Tax {
   value: number;
 }
 
-function SalesOrderForm() {
+// PurchaseOrderForm component from your original code
+export default function SalesOrderForm() {
   const navigate = useNavigate();
   // State for holding API data and loading status
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [taxes, setTaxes] = useState<Tax[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<SalesOrderFormValues>({
-    resolver: zodResolver(salesOrderSchema),
+  const form = useForm<PurchaseOrderFormValues>({
+    resolver: zodResolver(purchaseOrderSchema),
     defaultValues: {
-      soNumber: "S00001",
-      soDate: new Date(),
-      customerId: "",
+      poNumber: "P00001",
+      poDate: new Date(),
+      vendorId: "",
       reference: "",
       lineItems: [{ productName: "", quantity: 1, unitPrice: 0, taxRate: 0 }],
     },
@@ -72,13 +81,13 @@ function SalesOrderForm() {
     const fetchData = async () => {
       setLoadingData(true);
       try {
-        const [customerRes, productRes, taxRes] = await Promise.all([
-          axios.get("http://localhost:8000/api/v1/contacts/names?type=customer"),
+        const [vendorRes, productRes, taxRes] = await Promise.all([
+          axios.get("http://localhost:8000/api/v1/contacts?type=vendor"),
           axios.get("http://localhost:8000/api/v1/products"),
           axios.get("http://localhost:8000/api/v1/taxes"),
         ]);
 
-        if (customerRes.data?.data) setCustomers(customerRes.data.data);
+        if (vendorRes.data?.data) setVendors(vendorRes.data.data);
         if (productRes.data?.data) setProducts(productRes.data.data);
         if (taxRes.data?.data) setTaxes(taxRes.data.data);
       } catch (error) {
@@ -112,15 +121,15 @@ function SalesOrderForm() {
     );
   }, [watchedLineItems]);
 
-  async function onSubmit(values: SalesOrderFormValues) {
+  async function onSubmit(values: PurchaseOrderFormValues) {
     setIsSubmitting(true);
 
     const apiCall = async () => {
       const payload = {
-        contactId: parseInt(values.customerId, 10),
+        contactId: parseInt(values.vendorId, 10),
         reference: values.reference,
-        soDate: values.soDate,
-        soNumber: values.soNumber,
+        poDate: values.poDate,
+        poNumber: values.poNumber,
         lines: values.lineItems.map((item) => {
           const product = products.find(
             (p) => p.productName === item.productName
@@ -145,23 +154,23 @@ function SalesOrderForm() {
         }),
       };
       const response = await axios.post(
-        "http://localhost:8000/api/v1/sales/orders",
+        "http://localhost:8000/api/v1/purchase-orders",
         payload
       );
       return response.data.data;
     };
 
     toast.promise(apiCall(), {
-      loading: "Creating Sales Order...",
-      success: (soData) => {
-        const selectedCustomer = customers.find(
-          (c) => c.id === parseInt(values.customerId)
+      loading: "Creating Purchase Order...",
+      success: (poData) => {
+        const selectedVendor = vendors.find(
+          (v) => v.id === parseInt(values.vendorId)
         );
 
         const navigationState = {
-          salesOrderId: soData.id,
-          customerName: selectedCustomer?.contactName,
-          invoiceReference: values.reference,
+          purchaseOrderId: poData.id,
+          vendorName: selectedVendor?.contactName,
+          billReference: values.reference,
           lineItems: values.lineItems.map((item) => {
             const product = products.find(
               (p) => p.productName === item.productName
@@ -169,20 +178,16 @@ function SalesOrderForm() {
             return {
               ...item,
               hsnNo: product?.hsnCode || "",
-              accountName: "Sales A/c",
+              accountName: "Purchase Expense A/c",
             };
           }),
         };
 
-        navigate("/salesbill", { state: { soData: navigationState } });
-        return `SO #${soData.soNumber} created. Navigating to create invoice...`;
+        navigate("/bill", { state: { poData: navigationState } });
+        return `PO #${poData.poNumber} created. Navigating to create bill...`;
       },
       error: (err) => {
-        return (
-          err.response?.data?.error ||
-          err.message ||
-          "Failed to create Sales Order."
-        );
+        return err.message || "Failed to create Purchase Order.";
       },
       finally: () => {
         setIsSubmitting(false);
@@ -201,7 +206,9 @@ function SalesOrderForm() {
   return (
     <div className="max-w-7xl mx-auto my-10 font-sans p-4 bg-white rounded-lg shadow-sm">
       <div className="flex items-center justify-between mb-4 pb-4 border-b">
-        <h1 className="text-2xl font-semibold text-gray-800">New Sale Order</h1>
+        <h1 className="text-2xl font-semibold text-gray-800">
+          New Purchase Order
+        </h1>
         <div className="flex gap-2">
           <button
             onClick={() => navigate("/")}
@@ -223,35 +230,35 @@ function SalesOrderForm() {
           <div className="flex flex-col gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                SO No.
+                PO No.
               </label>
               <input
                 type="text"
-                {...form.register("soNumber")}
+                {...form.register("poNumber")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Customer Name
+                Vendor Name
               </label>
               <select
-                {...form.register("customerId")}
+                {...form.register("vendorId")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
                 disabled={loadingData}
               >
                 <option value="">
-                  {loadingData ? "Loading..." : "Select a customer"}
+                  {loadingData ? "Loading..." : "Select a vendor"}
                 </option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={String(customer.id)}>
-                    {customer.contactName}
+                {vendors.map((vendor) => (
+                  <option key={vendor.id} value={String(vendor.id)}>
+                    {vendor.contactName}
                   </option>
                 ))}
               </select>
-              {form.formState.errors.customerId && (
+              {form.formState.errors.vendorId && (
                 <p className="text-xs text-red-500 mt-1">
-                  {form.formState.errors.customerId.message}
+                  {form.formState.errors.vendorId.message}
                 </p>
               )}
             </div>
@@ -259,19 +266,19 @@ function SalesOrderForm() {
           <div className="flex flex-col gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                SO Date
+                PO Date
               </label>
               <input
                 type="date"
-                defaultValue={formatDateForInput(form.getValues("soDate"))}
-                {...form.register("soDate", {
+                defaultValue={formatDateForInput(form.getValues("poDate"))}
+                {...form.register("poDate", {
                   setValueAs: (value) => (value ? new Date(value) : undefined),
                 })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
               />
-              {form.formState.errors.soDate && (
+              {form.formState.errors.poDate && (
                 <p className="text-xs text-red-500 mt-1">
-                  {form.formState.errors.soDate.message}
+                  {form.formState.errors.poDate.message}
                 </p>
               )}
             </div>
@@ -283,7 +290,7 @@ function SalesOrderForm() {
                 type="text"
                 {...form.register("reference")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
-                placeholder="e.g., CUST-REF-001"
+                placeholder="e.g., REQ-25-0001"
               />
             </div>
           </div>
@@ -378,11 +385,11 @@ function SalesOrderForm() {
                           if (product) {
                             form.setValue(
                               `lineItems.${index}.unitPrice`,
-                              product.salesPrice
+                              product.purchasePrice
                             );
                             form.setValue(
                               `lineItems.${index}.taxRate`,
-                              product.salesTax
+                              product.purchaseTax
                             );
                           }
                         }}
@@ -495,4 +502,153 @@ function SalesOrderForm() {
   );
 }
 
-export default SalesOrderForm;
+// Placeholder for the Home page
+const HomePage = () => {
+  const navigate = useNavigate();
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
+        <HomeIcon size={48} className="mx-auto text-purple-600 mb-4" />
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Home Page</h1>
+        <p className="text-gray-600 mb-6">
+          Welcome to the Purchase Order application.
+        </p>
+        <button
+          onClick={() => navigate("/new-purchase-order")}
+          className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-lg font-semibold flex items-center justify-center gap-2"
+        >
+          <PlusCircle size={20} /> New Purchase Order
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Placeholder for the Bill page
+const BillPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const poData = location.state?.poData;
+
+  if (!poData) {
+    // If no data, redirect back to home
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+        <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">
+            No Purchase Order Data Found
+          </h1>
+          <p className="text-gray-600 mb-6">
+            Please create a purchase order first.
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-lg font-semibold flex items-center justify-center gap-2"
+          >
+            Go to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const { purchaseOrderId, vendorName, billReference, lineItems } = poData;
+
+  const totalAmount = lineItems.reduce((acc, item) => {
+    const untaxedAmount = item.quantity * item.unitPrice;
+    const taxAmount = untaxedAmount * (item.taxRate / 100);
+    return acc + untaxedAmount + taxAmount;
+  }, 0);
+
+  return (
+    <div className="max-w-4xl mx-auto my-10 p-6 bg-white rounded-lg shadow-sm">
+      <div className="flex justify-between items-center mb-6 pb-4 border-b">
+        <h1 className="text-3xl font-semibold text-gray-800">
+          Bill for PO #{purchaseOrderId}
+        </h1>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate("/new-purchase-order")}
+            className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
+          >
+            New PO
+          </button>
+          <button
+            onClick={() => navigate("/")}
+            className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
+          >
+            Home
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div>
+          <p className="text-gray-500 text-sm">Vendor:</p>
+          <p className="font-bold text-lg">{vendorName}</p>
+        </div>
+        <div>
+          <p className="text-gray-500 text-sm">Reference:</p>
+          <p className="font-bold text-lg">{billReference || "N/A"}</p>
+        </div>
+      </div>
+
+      <div className="border rounded-lg overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                Product
+              </th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                Qty
+              </th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                Unit Price
+              </th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                Tax Rate
+              </th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                Total
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {lineItems.map((item, index) => (
+              <tr key={index}>
+                <td className="px-4 py-2 text-sm text-gray-900">
+                  {item.productName}
+                </td>
+                <td className="px-4 py-2 text-sm text-gray-900">
+                  {item.quantity}
+                </td>
+                <td className="px-4 py-2 text-sm text-gray-900">
+                  {item.unitPrice.toFixed(2)}
+                </td>
+                <td className="px-4 py-2 text-sm text-gray-900">
+                  {item.taxRate}%
+                </td>
+                <td className="px-4 py-2 text-right text-sm text-gray-900">
+                  {(
+                    item.quantity *
+                    item.unitPrice *
+                    (1 + item.taxRate / 100)
+                  ).toFixed(2)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex justify-end mt-4">
+        <div className="text-right">
+          <p className="text-lg font-bold text-gray-800">
+            Grand Total: ${totalAmount.toFixed(2)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};

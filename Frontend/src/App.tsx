@@ -8,7 +8,7 @@ import Dashboard from "./Pages/Home";
 import { LoginForm } from "./Pages/Login";
 import { SignupForm } from "./Pages/SignUp";
 import CreateUserForm from "./Pages/CreateUser";
-import { DashboardNavbar } from "./components/ui/navbar";
+// import { DashboardNavbar } from "./components/ui/navbar";
 import ContactForm from "./Pages/ContactMaster";
 import ProductForm from "./Pages/Product-Master";
 import TaxForm from "./Pages/TaxMaster";
@@ -23,6 +23,9 @@ import { MasterDataListPage } from "./Pages/MasterDataListPage";
 import CustomerInvoicePortal from "./Pages/CustomerInvoiceViewPortal";
 import PaymentPage from "./Pages/PaymentPage";
 import PaymentSuccessPage from "./Pages/PaymentSuccessPage";
+import SalesOrderForm from "./Pages/SaleOrder";
+import SalesBillForm from "./Pages/SalesBill";
+import SalesPayment from "./Pages/SalesPayment";
 
 function App() {
   return (
@@ -56,6 +59,11 @@ function App() {
           <Route path="/order" element={<PurchaseOrderForm />} />
           <Route path="/bill" element={<VendorBillForm />} />
           <Route path="/payment" element={<BillPaymentForm />} />
+
+          <Route path="/sale-order" element={<SalesOrderForm />} />
+          <Route path="/salesbill" element={<SalesBillForm />} />
+          <Route path="/salespayment" element={<SalesPayment />} />
+
           <Route path="/ledger" element={<BillLedger />} />
           <Route
             path="/profit-loss-statement"

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, PlusCircle, XCircle } from "lucide-react";
+import { PlusCircle, XCircle, Loader2 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -18,7 +18,7 @@ const lineItemSchema = z.object({
 const salesOrderSchema = z.object({
   soNumber: z.string().optional(),
   soDate: z.date({
-    message: "A sales order date is required.",
+    message: "A SO date is required.",
   }),
   customerId: z.string().min(1, "Customer is required."),
   reference: z.string().optional(),
@@ -36,8 +36,8 @@ interface Customer {
 interface Product {
   id: number;
   productName: string;
-  salesPrice: number;
-  salesTax: number;
+  salesPrice: number; // Changed from purchasePrice
+  salesTax: number; // Changed from purchaseTax
   hsnCode?: string;
 }
 
@@ -47,7 +47,7 @@ interface Tax {
   value: number;
 }
 
-function SalesOrderForm() {
+function SalesPayment() {
   const navigate = useNavigate();
   // State for holding API data and loading status
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -59,7 +59,7 @@ function SalesOrderForm() {
   const form = useForm<SalesOrderFormValues>({
     resolver: zodResolver(salesOrderSchema),
     defaultValues: {
-      soNumber: "S00001",
+      soNumber: "SO00001",
       soDate: new Date(),
       customerId: "",
       reference: "",
@@ -73,9 +73,9 @@ function SalesOrderForm() {
       setLoadingData(true);
       try {
         const [customerRes, productRes, taxRes] = await Promise.all([
-          axios.get("http://localhost:8000/api/v1/contacts/names?type=customer"),
-          axios.get("http://localhost:8000/api/v1/products"),
-          axios.get("http://localhost:8000/api/v1/taxes"),
+          axios.get("https://api.example.com/api/v1/contacts?type=customer"), // Updated endpoint
+          axios.get("https://api.example.com/api/v1/products"), // Updated endpoint
+          axios.get("https://api.example.com/api/v1/taxes"), // Updated endpoint
         ]);
 
         if (customerRes.data?.data) setCustomers(customerRes.data.data);
@@ -119,8 +119,8 @@ function SalesOrderForm() {
       const payload = {
         contactId: parseInt(values.customerId, 10),
         reference: values.reference,
-        soDate: values.soDate,
-        soNumber: values.soNumber,
+        poDate: values.soDate,
+        poNumber: values.soNumber, // using poNumber to match the backend model
         lines: values.lineItems.map((item) => {
           const product = products.find(
             (p) => p.productName === item.productName
@@ -145,7 +145,7 @@ function SalesOrderForm() {
         }),
       };
       const response = await axios.post(
-        "http://localhost:8000/api/v1/sales/orders",
+        "https://api.example.com/api/v1/sales-orders", // Updated endpoint
         payload
       );
       return response.data.data;
@@ -161,7 +161,7 @@ function SalesOrderForm() {
         const navigationState = {
           salesOrderId: soData.id,
           customerName: selectedCustomer?.contactName,
-          invoiceReference: values.reference,
+          billReference: values.reference, // Use billReference to match the bill controller
           lineItems: values.lineItems.map((item) => {
             const product = products.find(
               (p) => p.productName === item.productName
@@ -169,20 +169,16 @@ function SalesOrderForm() {
             return {
               ...item,
               hsnNo: product?.hsnCode || "",
-              accountName: "Sales A/c",
+              accountName: "Sales Income A/c", // Changed account name
             };
           }),
         };
 
-        navigate("/salesbill", { state: { soData: navigationState } });
-        return `SO #${soData.soNumber} created. Navigating to create invoice...`;
+        navigate("/invoice", { state: { soData: navigationState } });
+        return `SO #${soData.poNumber} created. Navigating to create invoice...`;
       },
       error: (err) => {
-        return (
-          err.response?.data?.error ||
-          err.message ||
-          "Failed to create Sales Order."
-        );
+        return err.message || "Failed to create Sales Order.";
       },
       finally: () => {
         setIsSubmitting(false);
@@ -201,7 +197,9 @@ function SalesOrderForm() {
   return (
     <div className="max-w-7xl mx-auto my-10 font-sans p-4 bg-white rounded-lg shadow-sm">
       <div className="flex items-center justify-between mb-4 pb-4 border-b">
-        <h1 className="text-2xl font-semibold text-gray-800">New Sale Order</h1>
+        <h1 className="text-2xl font-semibold text-gray-800">
+          New Sales Order
+        </h1>
         <div className="flex gap-2">
           <button
             onClick={() => navigate("/")}
@@ -283,7 +281,7 @@ function SalesOrderForm() {
                 type="text"
                 {...form.register("reference")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
-                placeholder="e.g., CUST-REF-001"
+                placeholder="e.g., REQ-25-0001"
               />
             </div>
           </div>
@@ -495,4 +493,4 @@ function SalesOrderForm() {
   );
 }
 
-export default SalesOrderForm;
+export default SalesPayment;
