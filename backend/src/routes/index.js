@@ -10,6 +10,7 @@ import vendorPaymentRouter from "./vendorPayment.routes.js";
 import salesRouter from "./sales.routes.js";
 import ledgerRouter from "./ledger.routes.js";
 import { getBalanceSheet } from "../controllers/balanceSheet.controller.js"; // Correct import, removing the duplicate.
+import { getDashboardSummary } from "../controllers/dashboard.controller.js";
 
 import {
   userRegister,
@@ -39,6 +40,7 @@ router.use("/ledger", ledgerRouter); // Using the dedicated ledger router.
 // --- Single-Route Controllers ---
 // These are routes handled directly within this file.
 router.get("/balance-sheet", getBalanceSheet);
+router.get("/dashboard-summary", getDashboardSummary);
 
 // --- User Authentication Routes ---
 router.post("/register", userRegister);

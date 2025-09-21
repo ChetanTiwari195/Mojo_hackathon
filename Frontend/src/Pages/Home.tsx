@@ -1,22 +1,7 @@
-const ArrowDownIcon = (props) => (
-  <svg
-    {...props}
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 5v14" />
-    <path d="m19 12-7 7-7-7" />
-  </svg>
-);
+import { useState, useEffect } from "react";
+import axios from "axios";
 
-// Mock Card components for structure, styled with Tailwind CSS
+// --- Mock Card components for structure, styled with Tailwind CSS ---
 const Card = ({ children, className = "" }) => (
   <div
     className={`bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm ${className}`}
@@ -45,7 +30,71 @@ const CardContent = ({ children, className = "" }) => (
   <div className={`p-6 pt-0 ${className}`}>{children}</div>
 );
 
+// --- Type Definitions ---
+type DashboardData = {
+  sales: {
+    last24Hours: number;
+    last7Days: number;
+    last30Days: number;
+  };
+  purchases: {
+    last24Hours: number;
+    last7Days: number;
+    last30Days: number;
+  };
+  payments: {
+    last24Hours: number;
+    last7Days: number;
+    last30Days: number;
+  };
+};
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+  }).format(amount);
+};
+
 export default function Dashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const response = await axios.get(
+          "http://localhost:8000/api/v1/dashboard-summary"
+        );
+        setData(response.data);
+      } catch (err) {
+        console.error("Failed to fetch dashboard data:", err);
+        setError("Failed to load dashboard data. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-gray-500 dark:text-gray-400">Loading dashboard...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-red-500">{error}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen w-full flex-col bg-gray-100 dark:bg-gray-900">
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -59,16 +108,16 @@ export default function Dashboard() {
         </div>
 
         <div className="flex w-full flex-col gap-4">
-          {/* Total Invoice Card */}
+          {/* Total Sales Card */}
           <Card>
             <CardHeader>
-              <CardTitle>TOTAL INVOICE</CardTitle>
+              <CardTitle>TOTAL SALES</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-                    ₹10
+                    {formatCurrency(data?.sales?.last24Hours || 0)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Last 24 hours
@@ -76,7 +125,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-                    ₹23610
+                    {formatCurrency(data?.sales?.last7Days || 0)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Last 7 Days
@@ -84,7 +133,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-                    ₹23610
+                    {formatCurrency(data?.sales?.last30Days || 0)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Last 30 Days
@@ -103,19 +152,15 @@ export default function Dashboard() {
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-                    ₹5
+                    {formatCurrency(data?.purchases?.last24Hours || 0)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Last 24 hours
                   </p>
-                  <div className="flex items-center justify-center text-red-500 mt-1">
-                    <ArrowDownIcon className="h-4 w-4" />
-                    <span className="text-xs font-semibold">83.33 %</span>
-                  </div>
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-                    ₹17857
+                    {formatCurrency(data?.purchases?.last7Days || 0)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Last 7 Days
@@ -123,7 +168,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-                    ₹17857
+                    {formatCurrency(data?.purchases?.last30Days || 0)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Last 30 Days
@@ -142,19 +187,15 @@ export default function Dashboard() {
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-                    ₹5
+                    {formatCurrency(data?.payments?.last24Hours || 0)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Last 24 hours
                   </p>
-                  <div className="flex items-center justify-center text-red-500 mt-1">
-                    <ArrowDownIcon className="h-4 w-4" />
-                    <span className="text-xs font-semibold">80.00 %</span>
-                  </div>
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-                    ₹5752
+                    {formatCurrency(data?.payments?.last7Days || 0)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Last 7 Days
@@ -162,7 +203,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-                    ₹5752
+                    {formatCurrency(data?.payments?.last30Days || 0)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Last 30 Days
