@@ -1,5 +1,5 @@
 import { sequelize } from "../db/index.js";
-import SalesPayment from "../models/sales.payment.model.js";
+import SalesPayment from "../models/salesPayment.model.js";
 import SalesBill from "../models/salesBill.model.js";
 import Account from "../models/account.model.js";
 

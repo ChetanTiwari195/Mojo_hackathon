@@ -1,496 +1,438 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { z } from "zod";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PlusCircle, XCircle, Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft, Receipt } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
 
-// --- Zod Schema for Line Items and the Main Form ---
-const lineItemSchema = z.object({
-  productName: z.string().min(1, "Product name is required."),
-  quantity: z.coerce.number().positive("Qty must be positive."),
-  unitPrice: z.coerce.number().positive("Price must be positive."),
-  taxRate: z.coerce.number().min(0, "Tax cannot be negative.").max(100),
-});
-
-const salesOrderSchema = z.object({
-  soNumber: z.string().optional(),
-  soDate: z.date({
-    message: "A SO date is required.",
+// --- Zod Schema for Payment Form ---
+const paymentSchema = z.object({
+  paymentNumber: z.string().optional(),
+  paymentType: z.enum(["send", "receive"]),
+  date: z.date({
+    message: "A Payment date is required.",
   }),
-  customerId: z.string().min(1, "Customer is required."),
-  reference: z.string().optional(),
-  lineItems: z.array(lineItemSchema).min(1, "Please add at least one product."),
+  partnerType: z.enum(["customer", "vendor"]),
+  journalId: z.coerce.number().min(1, "Payment method is required."),
+  partner: z.string(),
+  note: z.string().optional(),
+  amount: z.coerce.number().positive("Amount must be positive."),
+  salesBillId: z.number().optional(), // Corrected from vendorBillId
 });
 
-type SalesOrderFormValues = z.infer<typeof salesOrderSchema>;
+type PaymentFormValues = z.infer<typeof paymentSchema>;
 
-// --- API Interfaces ---
-interface Customer {
+interface Account {
   id: number;
-  contactName: string;
+  accountName: string;
+  accountType: string;
 }
 
-interface Product {
-  id: number;
-  productName: string;
-  salesPrice: number; // Changed from purchasePrice
-  salesTax: number; // Changed from purchaseTax
-  hsnCode?: string;
+// Helper function to format date for input
+function formatDateForInput(date: Date): string {
+  if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+    return "";
+  }
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
-interface Tax {
-  id: number;
-  taxName: string;
-  value: number;
-}
-
-function SalesPayment() {
+function PaymentForm() {
   const navigate = useNavigate();
-  // State for holding API data and loading status
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [taxes, setTaxes] = useState<Tax[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const location = useLocation();
+  const billData = location.state?.billData;
 
-  const form = useForm<SalesOrderFormValues>({
-    resolver: zodResolver(salesOrderSchema),
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [journals, setJournals] = useState<Account[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Initialize form with safe defaults.
+  const form = useForm<PaymentFormValues>({
+    resolver: zodResolver(paymentSchema),
     defaultValues: {
-      soNumber: "SO00001",
-      soDate: new Date(),
-      customerId: "",
-      reference: "",
-      lineItems: [{ productName: "", quantity: 1, unitPrice: 0, taxRate: 0 }],
+      paymentType: "receive", // Correct default for sales bill
+      date: new Date(),
+      partnerType: "customer", // Correct default for sales bill
+      partner: "", // Default to an empty string
+      note: "",
+      amount: 0,
+      salesBillId: undefined, // Corrected from vendorBillId
+      journalId: undefined,
     },
   });
 
-  // Effect to fetch initial data when the component mounts
+  // Use this effect to populate form values once billData is available.
   useEffect(() => {
-    const fetchData = async () => {
-      setLoadingData(true);
-      try {
-        const [customerRes, productRes, taxRes] = await Promise.all([
-          axios.get("https://api.example.com/api/v1/contacts?type=customer"), // Updated endpoint
-          axios.get("https://api.example.com/api/v1/products"), // Updated endpoint
-          axios.get("https://api.example.com/api/v1/taxes"), // Updated endpoint
-        ]);
+    if (billData) {
+      form.reset({
+        paymentType: "receive",
+        partnerType: "customer",
+        partner: billData.customerName, // Use customerName from billData
+        amount: billData.totalAmount,
+        salesBillId: billData.salesBillId, // Use the correct ID from billData
+        date: new Date(),
+        journalId: journals.length > 0 ? journals[0].id : undefined,
+        note: `Payment for Sales Bill ${billData.billNumber || ""}`,
+      });
+    }
+  }, [billData, form, journals]);
 
-        if (customerRes.data?.data) setCustomers(customerRes.data.data);
-        if (productRes.data?.data) setProducts(productRes.data.data);
-        if (taxRes.data?.data) setTaxes(taxRes.data.data);
-      } catch (error) {
-        console.error("Failed to fetch initial data:", error);
-        toast.error("Failed to fetch initial data.");
-      } finally {
-        setLoadingData(false);
+  // Fetch journals (asset accounts) for the dropdown
+  useEffect(() => {
+    const fetchJournals = async () => {
+      try {
+        const res = await axios.get("http://localhost:8000/api/v1/accounts");
+        const assetAccounts = res.data.data.filter(
+          (acc: Account) => acc.accountType === "Assets"
+        );
+        setJournals(assetAccounts);
+        setIsLoading(false);
+      } catch (err) {
+        toast.error("Failed to load payment methods.");
+        console.error("Error fetching accounts:", err);
+        setIsLoading(false);
       }
     };
-    fetchData();
+
+    fetchJournals();
   }, []);
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "lineItems",
-  });
-
-  const watchedLineItems = form.watch("lineItems");
-
-  const totals = React.useMemo(() => {
-    return watchedLineItems.reduce(
-      (acc, item) => {
-        const untaxedAmount = (item.quantity || 0) * (item.unitPrice || 0);
-        const taxAmount = untaxedAmount * ((item.taxRate || 0) / 100);
-        acc.untaxed += untaxedAmount;
-        acc.tax += taxAmount;
-        acc.total += untaxedAmount + taxAmount;
-        return acc;
-      },
-      { untaxed: 0, tax: 0, total: 0 }
-    );
-  }, [watchedLineItems]);
-
-  async function onSubmit(values: SalesOrderFormValues) {
+  async function onSubmit(values: PaymentFormValues) {
     setIsSubmitting(true);
 
-    const apiCall = async () => {
-      const payload = {
-        contactId: parseInt(values.customerId, 10),
-        reference: values.reference,
-        poDate: values.soDate,
-        poNumber: values.soNumber, // using poNumber to match the backend model
-        lines: values.lineItems.map((item) => {
-          const product = products.find(
-            (p) => p.productName === item.productName
-          );
-          const tax = taxes.find((t) => Number(t.value) === item.taxRate);
-
-          if (!product) {
-            throw new Error(`Product "${item.productName}" not found.`);
-          }
-          if (!tax) {
-            throw new Error(
-              `Tax rate of ${item.taxRate}% for "${item.productName}" not found.`
-            );
-          }
-
-          return {
-            productId: product.id,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            taxId: tax.id,
-          };
-        }),
-      };
-      const response = await axios.post(
-        "https://api.example.com/api/v1/sales-orders", // Updated endpoint
-        payload
-      );
-      return response.data.data;
+    const payload = {
+      salesBillId: values.salesBillId, // Corrected to use the proper key
+      paymentDate: values.date,
+      journalId: values.journalId,
+      note: values.note,
+      amount: values.amount,
     };
 
-    toast.promise(apiCall(), {
-      loading: "Creating Sales Order...",
-      success: (soData) => {
-        const selectedCustomer = customers.find(
-          (c) => c.id === parseInt(values.customerId)
-        );
+    try {
+      await axios.post("http://localhost:8000/api/v1/sales/payments", payload);
 
-        const navigationState = {
-          salesOrderId: soData.id,
-          customerName: selectedCustomer?.contactName,
-          billReference: values.reference, // Use billReference to match the bill controller
-          lineItems: values.lineItems.map((item) => {
-            const product = products.find(
-              (p) => p.productName === item.productName
-            );
-            return {
-              ...item,
-              hsnNo: product?.hsnCode || "",
-              accountName: "Sales Income A/c", // Changed account name
-            };
-          }),
-        };
-
-        navigate("/invoice", { state: { soData: navigationState } });
-        return `SO #${soData.poNumber} created. Navigating to create invoice...`;
-      },
-      error: (err) => {
-        return err.message || "Failed to create Sales Order.";
-      },
-      finally: () => {
-        setIsSubmitting(false);
-      },
-    });
+      toast.success("Sales bill paid successfully!");
+      navigate("/");
+    } catch (err: any) {
+      console.error("Payment error:", err);
+      toast.error(err.response?.data?.error || "Failed to process payment.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  // Helper to format date for the input defaultValue
-  const formatDateForInput = (date: Date) => {
-    if (!date) return "";
-    const offset = date.getTimezoneOffset();
-    const adjustedDate = new Date(date.getTime() - offset * 60 * 1000);
-    return adjustedDate.toISOString().split("T")[0];
-  };
+  // If no bill data, redirect back
+  useEffect(() => {
+    if (!billData) {
+      toast.error("No bill data found. Please select a bill to pay.");
+      navigate(-1);
+    }
+  }, [billData, navigate]);
+
+  if (!billData) {
+    return (
+      <div className="max-w-6xl mx-auto my-10 font-sans p-4">
+        <div className="text-center py-8">
+          <p className="text-gray-500">Redirecting...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto my-10 font-sans p-4 bg-white rounded-lg shadow-sm">
-      <div className="flex items-center justify-between mb-4 pb-4 border-b">
-        <h1 className="text-2xl font-semibold text-gray-800">
-          New Sales Order
-        </h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => navigate("/")}
-            className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
-          >
-            Home
-          </button>
+    <div className="max-w-6xl mx-auto my-10 font-sans p-4 bg-white rounded-lg shadow-sm">
+      <div className="flex items-center justify-between mb-6 pb-4 border-b">
+        <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
-            className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
+            className="p-2 hover:bg-gray-100 rounded-md"
           >
-            Back
+            <ArrowLeft className="h-5 w-5" />
           </button>
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-800">
+              New Payment
+            </h1>
+            <p className="text-sm text-gray-600">
+              Receive payment for {billData.customerName} - Amount: ${" "}
+              {billData.totalAmount?.toFixed(2)}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Receipt className="h-5 w-5 text-purple-600" />
+          <span className="text-sm font-medium text-gray-700">
+            Bill: {billData.billNumber}
+          </span>
         </div>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="p-4 border rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                SO No.
-              </label>
-              <input
-                type="text"
-                {...form.register("soNumber")}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Customer Name
-              </label>
-              <select
-                {...form.register("customerId")}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
-                disabled={loadingData}
-              >
-                <option value="">
-                  {loadingData ? "Loading..." : "Select a customer"}
-                </option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={String(customer.id)}>
-                    {customer.contactName}
-                  </option>
-                ))}
-              </select>
-              {form.formState.errors.customerId && (
-                <p className="text-xs text-red-500 mt-1">
-                  {form.formState.errors.customerId.message}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                SO Date
-              </label>
-              <input
-                type="date"
-                defaultValue={formatDateForInput(form.getValues("soDate"))}
-                {...form.register("soDate", {
-                  setValueAs: (value) => (value ? new Date(value) : undefined),
-                })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
-              />
-              {form.formState.errors.soDate && (
-                <p className="text-xs text-red-500 mt-1">
-                  {form.formState.errors.soDate.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Reference
-              </label>
-              <input
-                type="text"
-                {...form.register("reference")}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
-                placeholder="e.g., REQ-25-0001"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div className="flex flex-wrap gap-2">
+        {/* Action Buttons */}
+        <div className="flex justify-between items-center">
+          <div className="flex gap-2">
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 text-sm font-semibold flex items-center"
+              className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 font-medium flex items-center disabled:opacity-50"
             >
               {isSubmitting && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              {isSubmitting ? "Submitting..." : "Confirm"}
+              {isSubmitting ? "Processing..." : "Confirm Payment"}
             </button>
             <button
               type="button"
-              className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
-            >
-              Print
-            </button>
-            <button
-              type="button"
-              onClick={() => form.reset()}
-              className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 font-medium"
             >
               Cancel
             </button>
           </div>
         </div>
 
-        <div className="border rounded-lg overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
-                  Sr.
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
-                  Product
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Qty
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Unit Price
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tax
-                </th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Untaxed Amount
-                </th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tax Amount
-                </th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {fields.map((item, index) => {
-                const {
-                  quantity = 0,
-                  unitPrice = 0,
-                  taxRate = 0,
-                } = watchedLineItems[index] || {};
-                const untaxedAmount = quantity * unitPrice;
-                const taxAmount = untaxedAmount * (taxRate / 100);
-                const total = untaxedAmount + taxAmount;
+        {/* Payment Form */}
+        <div className="p-6 border border-gray-200 rounded-lg space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Payment Type */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Payment Type
+              </label>
+              <div className="flex gap-6">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="send"
+                    {...form.register("paymentType")}
+                    className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
+                    disabled
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Send Money</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="receive"
+                    {...form.register("paymentType")}
+                    className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
+                    disabled
+                  />
+                  <span className="ml-2 text-sm text-gray-700">
+                    Receive Money
+                  </span>
+                </label>
+              </div>
+            </div>
 
-                return (
-                  <tr key={item.id}>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                      {index + 1}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <select
-                        {...form.register(`lineItems.${index}.productName`)}
-                        className="w-full px-2 py-1 border rounded text-sm"
-                        disabled={loadingData}
-                        onChange={(e) => {
-                          const name = e.target.value;
-                          const product = products.find(
-                            (p) => p.productName === name
-                          );
-                          form.setValue(`lineItems.${index}.productName`, name);
-                          if (product) {
-                            form.setValue(
-                              `lineItems.${index}.unitPrice`,
-                              product.salesPrice
-                            );
-                            form.setValue(
-                              `lineItems.${index}.taxRate`,
-                              product.salesTax
-                            );
-                          }
-                        }}
-                      >
-                        <option value="">
-                          {loadingData ? "Loading..." : "Select a product"}
-                        </option>
-                        {products.map((product) => (
-                          <option key={product.id} value={product.productName}>
-                            {product.productName}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap w-24">
-                      <input
-                        type="number"
-                        {...form.register(`lineItems.${index}.quantity`)}
-                        className="w-full px-2 py-1 border rounded text-sm"
-                      />
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap w-32">
-                      <input
-                        type="number"
-                        step="0.01"
-                        {...form.register(`lineItems.${index}.unitPrice`)}
-                        className="w-full px-2 py-1 border rounded text-sm"
-                      />
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap w-32">
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          {...form.register(`lineItems.${index}.taxRate`)}
-                          className="w-16 px-2 py-1 border rounded text-sm"
-                        />
-                        <span className="text-sm">%</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                      {untaxedAmount.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                      {taxAmount.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-bold text-gray-900">
-                      {total.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-center">
-                      <button
-                        type="button"
-                        onClick={() => remove(index)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <XCircle size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          <div className="p-3 border-t bg-gray-50">
-            <button
-              type="button"
-              onClick={() =>
-                append({
-                  productName: "",
-                  quantity: 1,
-                  unitPrice: 0,
-                  taxRate: 0,
-                })
-              }
-              className="text-purple-600 hover:text-purple-800 text-sm font-medium flex items-center gap-2"
-            >
-              <PlusCircle className="h-4 w-4" /> Add a line
-            </button>
+            {/* Payment Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Payment Date
+              </label>
+              <input
+                type="date"
+                {...form.register("date", {
+                  setValueAs: (v) => (v ? new Date(v) : new Date()),
+                })}
+                defaultValue={formatDateForInput(form.getValues("date"))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
+              />
+              {form.formState.errors.date && (
+                <p className="text-xs text-red-600 mt-1">
+                  {form.formState.errors.date.message}
+                </p>
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 p-4 bg-gray-50 border-t-2 gap-y-2">
-            <div className="col-start-1 md:col-start-3 text-sm font-medium text-gray-600">
-              Untaxed Amount:
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Partner Type */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Partner Type
+              </label>
+              <div className="flex gap-6">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="customer"
+                    {...form.register("partnerType")}
+                    className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
+                    disabled
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Customer</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="vendor"
+                    {...form.register("partnerType")}
+                    className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
+                    disabled
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Vendor</span>
+                </label>
+              </div>
             </div>
-            <div className="text-right text-sm font-medium text-gray-800">
-              {totals.untaxed.toFixed(2)}
+
+            {/* Payment Method */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Payment Via
+              </label>
+              <select
+                {...form.register("journalId")}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
+              >
+                {isLoading ? (
+                  <option value="">Loading methods...</option>
+                ) : (
+                  <>
+                    <option value="">Select Payment Method...</option>
+                    {journals.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.accountName}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+              {form.formState.errors.journalId && (
+                <p className="text-xs text-red-600 mt-1">
+                  {form.formState.errors.journalId.message}
+                </p>
+              )}
             </div>
-            <div className="col-start-1 md:col-start-3 text-sm font-medium text-gray-600">
-              Taxes:
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Partner/Customer */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Customer Name
+              </label>
+              <input
+                type="text"
+                {...form.register("partner")}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+                readOnly
+              />
             </div>
-            <div className="text-right text-sm font-medium text-gray-800">
-              {totals.tax.toFixed(2)}
+
+            {/* Amount */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Payment Amount
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-gray-500">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  {...form.register("amount")}
+                  className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-lg font-semibold bg-gray-100 cursor-not-allowed"
+                  readOnly
+                />
+              </div>
+              {form.formState.errors.amount && (
+                <p className="text-xs text-red-600 mt-1">
+                  {form.formState.errors.amount.message}
+                </p>
+              )}
             </div>
-            <div className="col-start-1 md:col-start-3 mt-2 pt-2 border-t text-base font-bold text-gray-800">
-              Total:
-            </div>
-            <div className="mt-2 pt-2 border-t text-right text-base font-bold text-gray-800">
-              {totals.total.toFixed(2)}
+          </div>
+
+          {/* Note */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Payment Note
+            </label>
+            <textarea
+              {...form.register("note")}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
+              placeholder="Add a note about this payment..."
+            />
+          </div>
+
+          {/* Bill Summary */}
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">
+              Bill Summary
+            </h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Bill Number:</span>
+                <span className="font-medium">{billData.billNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Customer:</span>
+                <span className="font-medium">{billData.customerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Bill ID:</span>
+                <span className="font-medium">#{billData.salesBillId}</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-gray-200">
+                <span className="text-gray-600 font-medium">Total Amount:</span>
+                <span className="font-bold text-lg">
+                  ${billData.totalAmount?.toFixed(2)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {form.formState.errors.lineItems?.message && (
-          <p className="text-sm text-red-500">
-            {form.formState.errors.lineItems.message}
-          </p>
+        {/* Form Validation Errors */}
+        {Object.keys(form.formState.errors).length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-red-800 mb-2">
+              Please fix the following errors:
+            </h4>
+            <ul className="text-sm text-red-700 space-y-1">
+              {Object.entries(form.formState.errors).map(([key, error]) => (
+                <li key={key}>• {error?.message}</li>
+              ))}
+            </ul>
+          </div>
         )}
+
+        {/* Submit Actions - Repeated for better UX */}
+        <div className="flex justify-between items-center pt-6 border-t border-gray-200">
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 font-medium flex items-center disabled:opacity-50"
+            >
+              {isSubmitting && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {isSubmitting ? "Processing Payment..." : "Confirm Payment"}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+          <div className="text-sm text-gray-500">
+            Amount to pay:{" "}
+            <span className="font-semibold">
+              ${billData.totalAmount?.toFixed(2)}
+            </span>
+          </div>
+        </div>
       </form>
     </div>
   );
 }
 
-export default SalesPayment;
+export default PaymentForm;

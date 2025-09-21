@@ -10,8 +10,8 @@ const PurchaseOrder = sequelize.define("PurchaseOrder", {
   },
   poNumber: {
     type: DataTypes.STRING,
-    unique: true,
-    allowNull: false,
+    // unique: true,
+    // allowNull: false,
   },
   poDate: {
     type: DataTypes.DATE,

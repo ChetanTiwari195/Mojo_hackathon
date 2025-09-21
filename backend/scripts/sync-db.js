@@ -11,6 +11,12 @@ import "../src/models/purchaseOrderLine.model.js";
 import "../src/models/vendorBill.model.js";
 import "../src/models/vendorBillLine.model.js";
 import "../src/models/vendorPayment.model.js";
+import "../src/models/salesOrder.model.js";
+import "../src/models/salesOrderLine.model.js";
+import "../src/models/salesBill.model.js";
+import "../src/models/salesBillLine.model.js";
+import "../src/models/salesPayment.model.js";
+// import "../src/models/user.js";
 
 const syncDatabase = async () => {
   try {

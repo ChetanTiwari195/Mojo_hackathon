@@ -9,8 +9,8 @@ const Tax = sequelize.define("Tax", {
   },
   taxName: {
     type: DataTypes.STRING,
-    allowNull: false,
-    unique: true, // e.g., "GST 5%", "Service Charge"
+    // allowNull: false,
+    // unique: true, // e.g., "GST 5%", "Service Charge"
   },
   computationMethod: {
     type: DataTypes.ENUM("percentage", "fixed"),
