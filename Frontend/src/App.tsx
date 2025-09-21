@@ -20,6 +20,9 @@ import BillLedger from "./Pages/Ledger";
 import ProfitLossStatement from "./Pages/PLStatement";
 import BalanceSheet from "./Pages/Balance-sheet";
 import { MasterDataListPage } from "./Pages/MasterDataListPage";
+import CustomerInvoicePortal from "./Pages/CustomerInvoiceViewPortal";
+import PaymentPage from "./Pages/PaymentPage";
+import PaymentSuccessPage from "./Pages/PaymentSuccessPage";
 
 function App() {
   return (
