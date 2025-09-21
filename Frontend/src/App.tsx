@@ -24,6 +24,8 @@ import CustomerInvoicePortal from "./Pages/CustomerInvoiceViewPortal";
 import PaymentPage from "./Pages/PaymentPage";
 import PaymentSuccessPage from "./Pages/PaymentSuccessPage";
 import SalesOrderForm from "./Pages/SaleOrder";
+import SalesBillForm from "./Pages/SalesBill";
+import SalesPayment from "./Pages/SalesPayment";
 
 function App() {
   return (
@@ -57,6 +59,11 @@ function App() {
           <Route path="/order" element={<PurchaseOrderForm />} />
           <Route path="/bill" element={<VendorBillForm />} />
           <Route path="/payment" element={<BillPaymentForm />} />
+
+          <Route path="/sale-order" element={<SalesOrderForm />} />
+          <Route path="/salesbill" element={<SalesBillForm />} />
+          <Route path="/salespayment" element={<SalesPayment />} />
+
           <Route path="/ledger" element={<BillLedger />} />
           <Route
             path="/profit-loss-statement"

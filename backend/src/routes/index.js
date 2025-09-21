@@ -7,6 +7,7 @@ import categoryRouter from "./category.routes.js";
 import accountRouter from "./account.routes.js"; // 1. Import the new router
 import vendorBillRouter from "./vendorBill.routes.js"; // 1. Import
 import vendorPaymentRouter from "./vendorPayment.routes.js"; // 1. Import
+import salesRouter from "./sales.routes.js";
 
 import {
   userRegister,
@@ -29,6 +30,7 @@ router.use("/contacts", contactMasterRouter);
 router.use("/products", productRouter);
 router.use("/taxes", taxRouter);
 router.use("/purchase-orders", purchaseOrderRouter);
+router.use("/sales", salesRouter);
 
 router.use("/vendor-bills", vendorBillRouter);
 router.get("/ledger", getLedger);
