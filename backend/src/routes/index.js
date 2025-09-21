@@ -21,6 +21,7 @@ import {
   getUserProfile,
 } from "../controllers/user.controller.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
+import { getCustomerInvoiceById } from "../controllers/customerInvoice.js";
 
 const router = Router();
 
@@ -41,6 +42,7 @@ router.use("/ledger", ledgerRouter); // Using the dedicated ledger router.
 // These are routes handled directly within this file.
 router.get("/balance-sheet", getBalanceSheet);
 router.get("/dashboard-summary", getDashboardSummary);
+router.get('/invoices/:id', authMiddleware, getCustomerInvoiceById);
 
 // --- User Authentication Routes ---
 router.post("/register", userRegister);
