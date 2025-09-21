@@ -4,10 +4,13 @@ import contactMasterRouter from "./contactMaster.routes.js";
 import productRouter from "./product.routes.js";
 import taxRouter from "./tax.routes.js";
 import categoryRouter from "./category.routes.js";
-import accountRouter from "./account.routes.js"; // 1. Import the new router
-import vendorBillRouter from "./vendorBill.routes.js"; // 1. Import
-import vendorPaymentRouter from "./vendorPayment.routes.js"; // 1. Import
+import accountRouter from "./account.routes.js";
+import vendorBillRouter from "./vendorBill.routes.js";
+import vendorPaymentRouter from "./vendorPayment.routes.js";
 import salesRouter from "./sales.routes.js";
+import ledgerRouter from "./ledger.routes.js";
+import { getBalanceSheet } from "../controllers/balanceSheet.controller.js"; // Correct import, removing the duplicate.
+import { getDashboardSummary } from "../controllers/dashboard.controller.js";
 
 import {
   userRegister,
@@ -23,12 +26,11 @@ import ledgerRouter from "./ledger.routes.js";
 
 import balanceSheetRouter from "./balance-sheet.routes.js";
 import { getBalanceSheet } from "../controllers/balance-sheet.controller.js";
-import { getProfitLoss } from "../controllers/profitLoss.controller.js";
 
 const router = Router();
 
-// 2. Register
-router.use("/vendor-payments", vendorPaymentRouter); // Add this line
+// --- Main Application Routers ---
+// Using .use() for modular routers to handle all sub-routes.
 router.use("/accounts", accountRouter);
 router.use("/categories", categoryRouter);
 router.use("/contacts", contactMasterRouter);
@@ -36,11 +38,17 @@ router.use("/products", productRouter);
 router.use("/taxes", taxRouter);
 router.use("/purchase-orders", purchaseOrderRouter);
 router.use("/sales", salesRouter);
-
 router.use("/vendor-bills", vendorBillRouter);
-router.get("/ledger", getLedger);
+router.use("/vendor-payments", vendorPaymentRouter);
+router.use("/ledger", ledgerRouter); // Using the dedicated ledger router.
 
-//User Routes
+// --- Single-Route Controllers ---
+// These are routes handled directly within this file.
+router.get("/balance-sheet", getBalanceSheet);
+router.get("/dashboard-summary", getDashboardSummary);
+router.get('/invoices/:id', authMiddleware, getCustomerInvoiceById);
+
+// --- User Authentication Routes ---
 router.post("/register", userRegister);
 router.post("/login", userLogin);
 router.get("/profile", authMiddleware, getUserProfile);
@@ -49,6 +57,5 @@ router.get("/getAllUsers", getAllUsers);
 router.get("/getUser/:id", getUserById);
 router.get("/ledger", ledgerRouter);
 router.get("/balance-sheet", getBalanceSheet);
-router.get("/profit-loss", getProfitLoss);
 
 export default router;
