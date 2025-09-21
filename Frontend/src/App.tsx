@@ -35,12 +35,14 @@ function App() {
         <Route path="/login" element={<LoginForm />} />
         <Route path="/signup" element={<SignupForm />} />
         <Route path="/create" element={<CreateUserForm />} />
-        <Route
-          path="/customer-invoice-portal"
-          element={<CustomerInvoicePortal />}
-        />
-        <Route path="/payment/:id" element={<PaymentPage />} />
-        <Route path="/payment-success" element={<PaymentSuccessPage />} />
+        <Route element={<RoleBasedRoutes allowedRoles={["Customer"]} />}>
+          <Route
+            path="/customer-invoice-portal"
+            element={<CustomerInvoicePortal />}
+          />
+          <Route path="/payment/:id" element={<PaymentPage />} />
+          <Route path="/payment-success" element={<PaymentSuccessPage />} />
+        </Route>
 
         {/* --- Routes for Admin & Invoicing (Create and View) --- */}
         <Route
