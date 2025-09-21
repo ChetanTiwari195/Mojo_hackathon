@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +11,9 @@ import { toast } from "sonner";
 const paymentSchema = z.object({
   paymentNumber: z.string().optional(),
   paymentType: z.enum(["send", "receive"]),
-  date: z.date(),
+  date: z.date({
+    message: "A Payment date is required.",
+  }),
   partnerType: z.enum(["customer", "vendor"]),
   journalId: z.coerce.number().min(1, "Payment method is required."),
   partner: z.string(),
@@ -46,6 +48,7 @@ function PaymentForm() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [journals, setJournals] = useState<Account[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -53,28 +56,38 @@ function PaymentForm() {
       paymentType: "send",
       date: new Date(),
       partnerType: "vendor",
-      partner: "",
-      note: "",
-      amount: 0,
+      partner: billData?.vendorName || "",
+      note: billData
+        ? `Payment for ${billData.billNumber || "Vendor Bill"}`
+        : "",
+      amount: billData?.totalAmount || 0,
+      vendorBillId: billData?.vendorBillId || undefined,
     },
   });
 
   // Fetch journals (asset accounts) for the dropdown
   useEffect(() => {
-    axios
-      .get("http://localhost:8000/api/v1/accounts")
-      .then((res) => {
+    const fetchJournals = async () => {
+      try {
+        const res = await axios.get("http://localhost:8000/api/v1/accounts");
         const assetAccounts = res.data.data.filter(
           (acc: Account) => acc.accountType === "Assets"
         );
         setJournals(assetAccounts);
-      })
-      .catch(() => toast.error("Failed to load payment methods."));
+        setIsLoading(false);
+      } catch (err) {
+        toast.error("Failed to load payment methods.");
+        console.error("Error fetching accounts:", err);
+        setIsLoading(false);
+      }
+    };
+
+    fetchJournals();
   }, []);
 
-  // Populate form from Vendor Bill data
+  // Update form values once billData and journals are loaded
   useEffect(() => {
-    if (billData) {
+    if (billData && journals.length > 0) {
       form.reset({
         paymentType: "send",
         partnerType: "vendor",
@@ -82,11 +95,12 @@ function PaymentForm() {
         amount: billData.totalAmount,
         vendorBillId: billData.vendorBillId,
         date: new Date(),
-        journalId: undefined, // User must select this
+        // Set the first journal as the default if it exists
+        journalId: journals[0]?.id || undefined,
         note: `Payment for ${billData.billNumber || "Vendor Bill"}`,
       });
     }
-  }, [billData, form]);
+  }, [billData, form, journals]);
 
   async function onSubmit(values: PaymentFormValues) {
     setIsSubmitting(true);
@@ -99,22 +113,11 @@ function PaymentForm() {
       amount: values.amount,
     };
 
-    console.log("Submitting payment payload:", payload);
-
     try {
-      const response = await axios.post(
-        "http://localhost:8000/api/v1/vendor-payments",
-        payload
-      );
+      await axios.post("http://localhost:8000/api/v1/vendor-payments", payload);
 
       toast.success("Bill paid successfully!");
-
-      // Navigate to dashboard or bills list on success
-      navigate("/", {
-        state: {
-          message: "Payment processed successfully!",
-        },
-      });
+      navigate("/");
     } catch (err: any) {
       console.error("Payment error:", err);
       toast.error(err.response?.data?.error || "Failed to process payment.");
@@ -126,7 +129,7 @@ function PaymentForm() {
   // If no bill data, redirect back
   useEffect(() => {
     if (!billData) {
-      toast.error("No bill data found. Please create a bill first.");
+      toast.error("No bill data found. Please select a bill to pay.");
       navigate(-1);
     }
   }, [billData, navigate]);
@@ -135,7 +138,7 @@ function PaymentForm() {
     return (
       <div className="max-w-6xl mx-auto my-10 font-sans p-4">
         <div className="text-center py-8">
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-gray-500">Redirecting...</p>
         </div>
       </div>
     );
@@ -156,7 +159,7 @@ function PaymentForm() {
               New Payment
             </h1>
             <p className="text-sm text-gray-600">
-              Pay bill for {billData.vendorName} - Amount: $
+              Pay bill for {billData.vendorName} - Amount: ${" "}
               {billData.totalAmount?.toFixed(2)}
             </p>
           </div>
@@ -237,7 +240,7 @@ function PaymentForm() {
                 {...form.register("date", {
                   setValueAs: (v) => (v ? new Date(v) : new Date()),
                 })}
-                defaultValue={formatDateForInput(new Date())}
+                defaultValue={formatDateForInput(form.getValues("date"))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
               />
               {form.formState.errors.date && (
@@ -287,12 +290,18 @@ function PaymentForm() {
                 {...form.register("journalId")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
               >
-                <option value="">Select Payment Method...</option>
-                {journals.map((j) => (
-                  <option key={j.id} value={j.id}>
-                    {j.accountName}
-                  </option>
-                ))}
+                {isLoading ? (
+                  <option value="">Loading methods...</option>
+                ) : (
+                  <>
+                    <option value="">Select Payment Method...</option>
+                    {journals.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.accountName}
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
               {form.formState.errors.journalId && (
                 <p className="text-xs text-red-600 mt-1">

@@ -4,7 +4,13 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusCircle, XCircle } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import axios from "axios"; // Import axios
+import axios from "axios";
+
+// --- Type Definitions ---
+type Account = {
+  id: number;
+  accountName: string;
+};
 
 // --- Zod Schema for Line Items and the Main Form ---
 const lineItemSchema = z.object({
@@ -32,9 +38,22 @@ const vendorBillSchema = z.object({
 
 type VendorBillFormValues = z.infer<typeof vendorBillSchema>;
 
+// Helper function to format date for input
+const formatDateForInput = (date: Date): string => {
+  if (!date) return "";
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 function VendorBillForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState({ type: "", text: "" });
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false); // New state variable
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -62,9 +81,27 @@ function VendorBillForm() {
     },
   });
 
-  // Effect to populate the form if data is passed from the purchase order form
+  // --- Fetch Accounts from API on component mount ---
   useEffect(() => {
-    if (poData) {
+    const fetchAccounts = async () => {
+      try {
+        const response = await axios.get(
+          "http://localhost:8000/api/v1/accounts"
+        );
+        setAccounts(response.data.data);
+      } catch (error) {
+        console.error("Failed to fetch accounts:", error);
+      } finally {
+        setIsLoadingAccounts(false);
+      }
+    };
+    fetchAccounts();
+  }, []);
+
+  // Effect to populate the form if data is passed from the purchase order form
+  // This now checks a local state variable to run only once.
+  useEffect(() => {
+    if (poData && !isInitialized) {
       form.reset({
         purchaseOrderId: poData.purchaseOrderId,
         vendorName: poData.vendorName,
@@ -74,10 +111,9 @@ function VendorBillForm() {
         dueDate: new Date(),
         billNumber: form.getValues("billNumber"),
       });
-      // Clear the state from location so a refresh doesn't re-populate the form
-      navigate(".", { replace: true, state: {} });
+      setIsInitialized(true); // Mark as initialized
     }
-  }, [poData, form, navigate]);
+  }, [poData, form, isInitialized]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -106,29 +142,28 @@ function VendorBillForm() {
 
     const payload = {
       ...values,
-      billDate: values.billDate.toISOString().split("T")[0],
-      dueDate: values.dueDate.toISOString().split("T")[0],
+      billDate: formatDateForInput(values.billDate),
+      dueDate: formatDateForInput(values.dueDate),
     };
 
     console.log("Submitting Vendor Bill:", payload);
 
     try {
-      // Use axios.post instead of fetch
       const response = await axios.post(
         "http://localhost:8000/api/v1/vendor-bills",
         payload
       );
 
-      const result = response.data; // With axios, data is directly available on the .data property
+      const result = response.data;
 
       setSubmitMessage({
         type: "success",
         text: result.message || "Vendor Bill created successfully!",
       });
       form.reset();
+      navigate("/payment");
     } catch (error: any) {
-      console.error("Submission failed:", error);
-      // Axios provides more structured error info
+      console.log(error);
       const errorMessage =
         error.response?.data?.details ||
         error.response?.data?.error ||
@@ -142,11 +177,6 @@ function VendorBillForm() {
       setIsSubmitting(false);
     }
   }
-
-  const formatDateForInput = (date: Date) => {
-    if (!date) return "";
-    return date.toISOString().split("T")[0];
-  };
 
   return (
     <div className="max-w-7xl mx-auto my-10 font-sans p-4 bg-gray-50">
@@ -330,12 +360,18 @@ function VendorBillForm() {
                         {...form.register(`lineItems.${index}.accountName`)}
                         className="w-full px-2 py-1 border rounded text-sm bg-white"
                       >
-                        <option value="Purchase Expense A/c">
-                          Purchase Expense A/c
-                        </option>
-                        <option value="General Expenses A/c">
-                          General Expenses A/c
-                        </option>
+                        {isLoadingAccounts ? (
+                          <option>Loading accounts...</option>
+                        ) : (
+                          accounts.map((account) => (
+                            <option
+                              key={account.id}
+                              value={account.accountName}
+                            >
+                              {account.accountName}
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
                     <div className="col-span-1">
@@ -389,7 +425,8 @@ function VendorBillForm() {
                   append({
                     productName: "",
                     hsnNo: "",
-                    accountName: "Purchase Expense A/c",
+                    accountName:
+                      accounts.length > 0 ? accounts[0].accountName : "",
                     quantity: 1,
                     unitPrice: 0,
                     taxRate: 0,
