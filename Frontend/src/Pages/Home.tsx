@@ -1,4 +1,3 @@
-
 const ArrowDownIcon = (props) => (
   <svg
     {...props}
@@ -69,7 +68,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-                    ₹0
+                    ₹10
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Last 24 hours
@@ -104,7 +103,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-                    ₹0
+                    ₹5
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Last 24 hours
@@ -143,7 +142,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <p className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-                    ₹0
+                    ₹5
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Last 24 hours
