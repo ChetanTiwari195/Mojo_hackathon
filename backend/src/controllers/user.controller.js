@@ -171,3 +171,21 @@ export const getUserById = async (req, res) => {
     });
   }
 };
+
+export const getUserProfile = async (req, res) => {
+  // The authMiddleware has already verified the token and attached the user
+  // to the request object (req.user). We just need to send it back.
+
+  if (req.user) {
+    res.status(200).json({
+      user: {
+        id: req.user.id,
+        name: req.user.name,
+        email: req.user.email,
+        role: req.user.role,
+      },
+    });
+  } else {
+    res.status(404).json({ message: "User not found" });
+  }
+};

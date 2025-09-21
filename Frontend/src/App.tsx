@@ -1,6 +1,9 @@
 import "./App.css";
 import { Route, Routes } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
+
+// Page and Component Imports
+import RoleBasedRoutes from "./components/RoleBasedRoutes";
 import Dashboard from "./Pages/Home";
 import { LoginForm } from "./Pages/Login";
 import { SignupForm } from "./Pages/SignUp";
@@ -22,39 +25,49 @@ function App() {
   return (
     <div>
       <Toaster richColors position="top-right" />
-      <DashboardNavbar />
+
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/master-data" element={<MasterDataListPage />} />
-
-        {/* Routes for Creating a new contact, product, tax, etc. */}
-        <Route path="/contact-master/create" element={<ContactForm />} />
-        <Route path="/product-master/create" element={<ProductForm />} />
-        <Route path="/tax-master/create" element={<TaxForm />} />
-        <Route path="/chart-of-accounts/create" element={<AccountForm />} />
-
-        {/* Routes for Editing an existing contact, product, or tax */}
-        <Route path="/contact-master/:id/edit" element={<ContactForm />} />
-        <Route path="/product-master/:id/edit" element={<ProductForm />} />
-        <Route path="/tax-master/:id/edit" element={<TaxForm />} />
-
-        {/* order pages */}
-        <Route path="/order" element={<PurchaseOrderForm />} />
-        <Route path="/bill" element={<VendorBillForm />} />
-        <Route path="/payment" element={<BillPaymentForm />} />
-
-        {/* ledgers */}
-        <Route path="/ledger" element={<BillLedger />} />
-        <Route
-          path="/profit-loss-statement"
-          element={<ProfitLossStatement />}
-        />
-        <Route path="/balance-sheet" element={<BalanceSheet />} />
-
-        {/* login/signup pages */}
+        {/* --- Public Routes (Accessible to everyone) --- */}
         <Route path="/login" element={<LoginForm />} />
         <Route path="/signup" element={<SignupForm />} />
         <Route path="/create" element={<CreateUserForm />} />
+        <Route
+          path="/customer-invoice-portal"
+          element={<CustomerInvoicePortal />}
+        />
+        <Route path="/payment/:id" element={<PaymentPage />} />
+        <Route path="/payment-success" element={<PaymentSuccessPage />} />
+
+        {/* --- Routes for Admin & Invoicing (Create and View) --- */}
+        <Route
+          element={<RoleBasedRoutes allowedRoles={["Admin", "Invoicing"]} />}
+        >
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/master-data" element={<MasterDataListPage />} />
+          <Route path="/contact-master/create" element={<ContactForm />} />
+          <Route path="/product-master/create" element={<ProductForm />} />
+          <Route path="/tax-master/create" element={<TaxForm />} />
+          <Route path="/chart-of-accounts/create" element={<AccountForm />} />
+          <Route path="/order" element={<PurchaseOrderForm />} />
+          <Route path="/bill" element={<VendorBillForm />} />
+          <Route path="/payment" element={<BillPaymentForm />} />
+          <Route path="/ledger" element={<BillLedger />} />
+          <Route
+            path="/profit-loss-statement"
+            element={<ProfitLossStatement />}
+          />
+          <Route path="/balance-sheet" element={<BalanceSheet />} />
+        </Route>
+
+        {/* --- Routes for Admin ONLY (Edit) --- */}
+        <Route element={<RoleBasedRoutes allowedRoles={["Admin"]} />}>
+          <Route path="/contact-master/:id/edit" element={<ContactForm />} />
+          <Route path="/product-master/:id/edit" element={<ProductForm />} />
+          <Route path="/tax-master/:id/edit" element={<TaxForm />} />
+        </Route>
+
+        {/* Optional: Add a "Not Found" route */}
+        <Route path="*" element={<h1>404: Page Not Found</h1>} />
       </Routes>
     </div>
   );
