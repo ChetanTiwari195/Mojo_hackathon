@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios"; // 👈 Import Axios
+import axios from "axios";
 import {
   Card,
   CardContent,
@@ -17,29 +17,36 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 
-// --- Type Definitions ---
+// --- Updated Type Definition to match actual backend response ---
 type Transaction = {
   partnerName: string;
   accountName: string;
-  invoiceRef: string;
-  invoiceDate: string;
+  invoiceRef: string; // Your backend returns invoiceRef
+  invoiceDate: string; // Your backend returns invoiceDate
   dueDate: string | null;
   amount: number;
-  balance: number | null;
+  balance: number | null; // Your backend can return null for balance
 };
 
-// ❌ OLD: Dummy Fetch Function
-// const fetchLedgerData = async (): Promise<Transaction[]> => { ... };
-
-// ✅ NEW: Fetch function using Axios
+// --- API Fetch Function using Axios ---
 const fetchLedgerData = async (): Promise<Transaction[]> => {
-  console.log("Fetching ledger data from API using Axios...");
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
+  console.log(`Fetching ledger data from: ${apiUrl}/ledger`);
+
   try {
-    const response = await axios.get("http://localhost:3000/api/ledger");
-    return response.data;
+    const response = await axios.get(`${apiUrl}/ledger`);
+
+    // Your backend returns data directly as an array
+    if (Array.isArray(response.data)) {
+      return response.data;
+    } else {
+      console.error("Expected array but got:", response.data);
+      return [];
+    }
   } catch (error) {
     console.error("Failed to fetch ledger data:", error);
-    throw error; // Re-throw to be caught by useEffect's catch block
+    return [];
   }
 };
 
@@ -55,19 +62,22 @@ const formatCurrency = (num: number | null | undefined): string => {
   });
 };
 
-// --- The Transaction Ledger Component ---
+// --- The Main Transaction Ledger Component ---
 function TransactionLedger() {
   const [data, setData] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const getData = async () => {
       try {
         setIsLoading(true);
+        setError(null);
         const fetchedData = await fetchLedgerData();
         setData(fetchedData);
-      } catch (error) {
-        console.error("Failed to fetch ledger data:", error);
+      } catch (err) {
+        setError("Failed to load transaction data. Please try again later.");
+        console.error(err);
       } finally {
         setIsLoading(false);
       }
@@ -82,7 +92,7 @@ function TransactionLedger() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto my-10 font-sans">
+    <div className="max-w-7xl mx-auto my-10 font-sans p-4">
       {/* --- Top Navigation Buttons --- */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex gap-2">
@@ -105,7 +115,7 @@ function TransactionLedger() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Transaction Ledger</CardTitle>
+          <CardTitle>Partner Ledger</CardTitle>
           <CardDescription>
             Showing all transactions as on {currentDate}
           </CardDescription>
@@ -115,14 +125,18 @@ function TransactionLedger() {
             <div className="flex items-center justify-center h-96">
               <p>Loading transaction data...</p>
             </div>
-          ) : (
+          ) : error ? (
+            <div className="flex items-center justify-center h-96 text-red-500">
+              <p>{error}</p>
+            </div>
+          ) : data && data.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Partner Name</TableHead>
                   <TableHead>Account Name</TableHead>
                   <TableHead>Invoice / Bill Ref.</TableHead>
-                  <TableHead>Invoice Date</TableHead>
+                  <TableHead>Date</TableHead>
                   <TableHead>Due Date</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
@@ -134,18 +148,38 @@ function TransactionLedger() {
                     <TableCell>{transaction.partnerName}</TableCell>
                     <TableCell>{transaction.accountName}</TableCell>
                     <TableCell>{transaction.invoiceRef}</TableCell>
-                    <TableCell>{transaction.invoiceDate}</TableCell>
-                    <TableCell>{transaction.dueDate || "-"}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell>
+                      {new Date(transaction.invoiceDate).toLocaleDateString(
+                        "en-GB"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {transaction.dueDate
+                        ? new Date(transaction.dueDate).toLocaleDateString(
+                            "en-GB"
+                          )
+                        : "-"}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right ${
+                        transaction.amount < 0
+                          ? "text-red-500"
+                          : "text-green-600"
+                      }`}
+                    >
                       {formatCurrency(transaction.amount)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right font-medium">
                       {formatCurrency(transaction.balance)}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+          ) : (
+            <div className="flex items-center justify-center h-96 text-gray-500">
+              <p>No transaction data available.</p>
+            </div>
           )}
         </CardContent>
       </Card>

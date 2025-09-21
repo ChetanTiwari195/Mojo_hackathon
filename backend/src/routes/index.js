@@ -18,6 +18,10 @@ import {
 } from "../controllers/user.controller.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { getLedger } from "../controllers/ledger.controller.js";
+import ledgerRouter from "./ledger.routes.js";
+
+import balanceSheetRouter from "./balance-sheet.routes.js";
+import { getBalanceSheet } from "../controllers/balance-sheet.controller.js";
 
 const router = Router();
 
@@ -40,4 +44,7 @@ router.get("/profile", authMiddleware, getUserProfile);
 router.put("/update/:id", updateUser);
 router.get("/getAllUsers", getAllUsers);
 router.get("/getUser/:id", getUserById);
+router.get("/ledger", ledgerRouter);
+router.get("/balance-sheet", getBalanceSheet);
+
 export default router;
