@@ -7,7 +7,6 @@ import categoryRouter from "./category.routes.js";
 import accountRouter from "./account.routes.js"; // 1. Import the new router
 import vendorBillRouter from "./vendorBill.routes.js"; // 1. Import
 import vendorPaymentRouter from "./vendorPayment.routes.js"; // 1. Import
-import salesOrderRouter from "./salesOrder.routes.js"; // 1. Import
 import {
   userRegister,
   userLogin,
@@ -17,6 +16,7 @@ import {
   getUserProfile,
 } from "../controllers/user.controller.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
+import { getLedger } from "../controllers/ledger.controller.js";
 
 const router = Router();
 
@@ -30,6 +30,7 @@ router.use("/taxes", taxRouter);
 router.use("/purchase-orders", purchaseOrderRouter);
 router.use("/sale-order", salesOrderRouter);
 router.use("/vendor-bills", vendorBillRouter);
+router.get("/ledger", getLedger);
 
 //User Routes
 router.post("/register", userRegister);
