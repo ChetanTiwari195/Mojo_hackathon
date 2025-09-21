@@ -71,7 +71,7 @@ function SalesBillForm() {
         {
           productName: "",
           hsnNo: "",
-          accountName: "Sales Income A/c", // Adjusted default account
+          accountName: "", // Adjusted default account
           quantity: 1,
           unitPrice: 0,
           taxRate: 0,
@@ -163,7 +163,7 @@ function SalesBillForm() {
       });
 
       // Navigate to the payment page and pass the newly created bill data
-      navigate("/sales-payment", {
+      navigate("/salespayment", {
         state: {
           billData: {
             salesBillId: result.id,

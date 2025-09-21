@@ -174,7 +174,7 @@ function SalesOrderForm() {
           }),
         };
 
-        navigate("/invoice", { state: { soData: navigationState } });
+        navigate("/salesbill", { state: { soData: navigationState } });
         return `SO #${soData.soNumber} created. Navigating to create invoice...`;
       },
       error: (err) => {
