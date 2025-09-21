@@ -38,7 +38,7 @@ const userFormSchema = z
     name: z.string().min(3, "Name must be at least 3 characters."),
     email: z.string().email("Please enter a valid email address."),
     // Values capitalized to match backend ENUM ('Admin', 'Invoicing', 'Contact')
-    role: z.enum(["Admin", "Invoicing", "Contact"]),
+    role: z.enum(["Admin", "Invoicing", "Customer"]),
     password: z.string().min(8, "Password must be at least 8 characters long."),
     password2: z.string(),
   })
@@ -68,7 +68,7 @@ function CreateUserForm() {
     defaultValues: {
       name: "",
       email: "",
-      role: "Contact",
+      role: "Customer",
       password: "",
       password2: "",
     },
@@ -161,7 +161,7 @@ function CreateUserForm() {
                         <SelectContent>
                           <SelectItem value="Admin">Admin</SelectItem>
                           <SelectItem value="Invoicing">Invoicing</SelectItem>
-                          <SelectItem value="Contact">Contact</SelectItem>
+                          <SelectItem value="Customer">Customer</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

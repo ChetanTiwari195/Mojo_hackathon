@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import axios from "axios";
 import {
   Card,
   CardContent,
@@ -26,24 +27,25 @@ type LedgerEntry = {
 type ProfitLossData = {
   expenses: LedgerEntry[];
   income: LedgerEntry[];
+  netProfit: number;
 };
 
-// --- Dummy Fetch Function ---
-// This function simulates an API call to fetch the P&L data.
+// --- API Fetch Function ---
 const fetchProfitLossData = async (): Promise<ProfitLossData> => {
-  console.log("Fetching data from dummy API...");
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const mockData: ProfitLossData = {
-        expenses: [
-          { account: "Purchase Expense A/c", amount: 17857.5 },
-          { account: "Other Expense A/c", amount: 0.0 },
-        ],
-        income: [{ account: "Sales Income A/c", amount: 23610 }],
-      };
-      resolve(mockData);
-    }, 1000); // Simulate a 1-second network delay
-  });
+  try {
+    const response = await axios.get("http://localhost:8000/api/v1/profit-loss");
+
+    const { income, expenses, netProfit } = response.data;
+
+    return {
+      income: [{ account: "Sales Income A/c", amount: income }],
+      expenses: [{ account: "Purchase Expense A/c", amount: expenses }],
+      netProfit,
+    };
+  } catch (error) {
+    console.error("API fetch failed:", error);
+    throw error;
+  }
 };
 
 // --- Formatting Helpers ---
@@ -57,11 +59,9 @@ const formatCurrency = (num: number) => {
 
 // --- The Profit & Loss Statement Component ---
 function ProfitLossStatement() {
-  // --- State Management ---
   const [data, setData] = useState<ProfitLossData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // --- Data Fetching on Component Mount ---
   useEffect(() => {
     const getData = async () => {
       try {
@@ -77,20 +77,11 @@ function ProfitLossStatement() {
     getData();
   }, []);
 
-  // --- Calculations ---
-  const totalExpenses = data
-    ? data.expenses.reduce((acc, item) => acc + item.amount, 0)
-    : 0;
-  const totalIncome = data
-    ? data.income.reduce((acc, item) => acc + item.amount, 0)
-    : 0;
-  const netProfit = totalIncome - totalExpenses;
-  const grandTotal = Math.max(
-    totalIncome,
-    totalExpenses + (netProfit > 0 ? netProfit : 0)
-  );
+  const totalExpenses = data ? data.expenses.reduce((acc, item) => acc + item.amount, 0) : 0;
+  const totalIncome = data ? data.income.reduce((acc, item) => acc + item.amount, 0) : 0;
+  const netProfit = data ? data.netProfit : 0;
+  const grandTotal = Math.max(totalIncome, totalExpenses + (netProfit > 0 ? netProfit : 0));
 
-  // Get the current date for the description
   const currentDate = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -137,9 +128,7 @@ function ProfitLossStatement() {
                   {data.expenses.map((item, index) => (
                     <TableRow key={`expense-${index}`}>
                       <TableCell>{item.account}</TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(item.amount)}
-                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
                     </TableRow>
                   ))}
                   {netProfit > 0 && (
@@ -154,9 +143,7 @@ function ProfitLossStatement() {
                 <TableFooter>
                   <TableRow>
                     <TableCell className="font-bold">Total</TableCell>
-                    <TableCell className="text-right font-bold">
-                      {formatCurrency(grandTotal)}
-                    </TableCell>
+                    <TableCell className="text-right font-bold">{formatCurrency(grandTotal)}</TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>
@@ -173,9 +160,7 @@ function ProfitLossStatement() {
                   {data.income.map((item, index) => (
                     <TableRow key={`income-${index}`}>
                       <TableCell>{item.account}</TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(item.amount)}
-                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
                     </TableRow>
                   ))}
                   {netProfit < 0 && (
@@ -190,9 +175,7 @@ function ProfitLossStatement() {
                 <TableFooter>
                   <TableRow>
                     <TableCell className="font-bold">Total</TableCell>
-                    <TableCell className="text-right font-bold">
-                      {formatCurrency(grandTotal)}
-                    </TableCell>
+                    <TableCell className="text-right font-bold">{formatCurrency(grandTotal)}</TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>

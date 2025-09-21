@@ -6,7 +6,7 @@ import User from "../models/User.js";
 // Register User
 export const userRegister = async (req, res) => {
   console.log(req.body);
-  const { name, role, email, password,password2, profile_image = "" } = req.body;
+  const { name, role, email, password, password2, profile_image = "" } = req.body;
 
   if (!name || !role || !email || !password) {
     return res.status(400).json({ message: "Name, role, email, and password are required." });
@@ -17,22 +17,28 @@ export const userRegister = async (req, res) => {
   }
 
   try {
+    // Check if user already exists
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(409).json({ message: "User with this email already exists." });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const query = `
-      INSERT INTO users (name, role, email, password)
-      VALUES (?, ?, ?, ?)
-    `;
-
-    await sequelize.query(query, {
-      replacements: [name, role, email, hashedPassword],
-      type: sequelize.QueryTypes.INSERT
+    // Use Sequelize's create method instead of a raw query
+    await User.create({
+      name,
+      role,
+      email,
+      password: hashedPassword,
+      profile_image
     });
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error", error });
+    // The error object now comes from Sequelize, which provides more context
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
