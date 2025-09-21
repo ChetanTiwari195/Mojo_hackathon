@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import axios from "axios"; // 👈 Import Axios
 import {
   Card,
   CardContent,
@@ -22,63 +23,30 @@ type Transaction = {
   accountName: string;
   invoiceRef: string;
   invoiceDate: string;
-  dueDate: string;
+  dueDate: string | null;
   amount: number;
   balance: number | null;
 };
 
-// --- Dummy Fetch Function ---
+// ❌ OLD: Dummy Fetch Function
+// const fetchLedgerData = async (): Promise<Transaction[]> => { ... };
+
+// ✅ NEW: Fetch function using Axios
 const fetchLedgerData = async (): Promise<Transaction[]> => {
-  console.log("Fetching ledger data from dummy API...");
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const mockData: Transaction[] = [
-        {
-          partnerName: "Azure Interior",
-          accountName: "Creditor A/c",
-          invoiceRef: "Bill/2025/0001",
-          invoiceDate: "18/09/2025",
-          dueDate: "18/09/2025",
-          amount: 17857.5,
-          balance: 17857.5,
-        },
-        {
-          partnerName: "Azure Interior",
-          accountName: "Creditor A/c",
-          invoiceRef: "Pay/25/0001",
-          invoiceDate: "18/09/2025",
-          dueDate: "",
-          amount: -17857.5,
-          balance: 0,
-        },
-        {
-          partnerName: "Nimesh Pathak",
-          accountName: "Debtors A/c",
-          invoiceRef: "INV/2025/0001",
-          invoiceDate: "18/09/2025",
-          dueDate: "18/09/2025",
-          amount: 23610,
-          balance: 23610,
-        },
-        {
-          partnerName: "Nimesh Pathak",
-          accountName: "Debtors A/c",
-          invoiceRef: "Pay/25/0002",
-          invoiceDate: "18/09/2025",
-          dueDate: "",
-          amount: -23610,
-          balance: 0,
-        },
-      ];
-      resolve(mockData);
-    }, 1000);
-  });
+  console.log("Fetching ledger data from API using Axios...");
+  try {
+    const response = await axios.get("http://localhost:3000/api/ledger");
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch ledger data:", error);
+    throw error; // Re-throw to be caught by useEffect's catch block
+  }
 };
 
 // --- Formatting Helper ---
 const formatCurrency = (num: number | null | undefined): string => {
   if (num === null || num === undefined) {
-    return "-"; // Return a dash for null or undefined balances
+    return "-";
   }
   return num.toLocaleString("en-IN", {
     style: "currency",
