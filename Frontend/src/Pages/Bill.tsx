@@ -7,9 +7,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
 
-// --- Zod Schema Definitions ---
+// --- Zod Schema for Line Items and the Main Form ---
 const lineItemSchema = z.object({
-  productId: z.number(),
+  productId: z.number(), // Keep track of the original product ID
   productName: z.string().min(1, "Product name is required."),
   hsnNo: z.string().optional(),
   accountId: z.number().min(1, "Account is required."),
@@ -18,21 +18,23 @@ const lineItemSchema = z.object({
   taxRate: z.coerce.number().min(0, "Tax cannot be negative.").max(100),
 });
 
-// Use `z.string()` for date inputs and transform it for validation.
-// This perfectly matches how HTML <input type="date"> works.
+// Fixed Zod Schema for dates
 const vendorBillSchema = z.object({
   purchaseOrderId: z.number().optional(),
   billNumber: z.string().optional(),
-  billDate: z.string().min(1, "Bill date is required."),
-  dueDate: z.string().min(1, "Due date is required."),
+  billDate: z
+    .string()
+    .min(1, "Bill date is required.")
+    .transform((str) => new Date(str)),
+  dueDate: z
+    .string()
+    .min(1, "Due date is required.")
+    .transform((str) => new Date(str)),
   vendorName: z.string().min(2, "Vendor name is required."),
   billReference: z.string().optional(),
-  lineItems: z
-    .array(lineItemSchema)
-    .min(1, "You must add at least one line item to the bill."),
+  lineItems: z.array(lineItemSchema).min(1, "Please add at least one product."),
 });
 
-// The form values will have dates as strings, matching the input elements.
 type VendorBillFormValues = z.infer<typeof vendorBillSchema>;
 
 // --- API Interfaces ---
@@ -41,7 +43,7 @@ interface Account {
   accountName: string;
 }
 
-// --- Helper Function ---
+// Move formatDateForInput function outside and above the component
 function formatDateForInput(date: Date): string {
   if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
     return "";
@@ -52,7 +54,6 @@ function formatDateForInput(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-// --- React Component ---
 function VendorBillForm() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,15 +66,15 @@ function VendorBillForm() {
     resolver: zodResolver(vendorBillSchema),
     defaultValues: {
       billNumber: "Bill/2025/0001",
-      billDate: formatDateForInput(new Date()), // Use formatted string
-      dueDate: formatDateForInput(new Date()), // Use formatted string
+      billDate: formatDateForInput(new Date()),
+      dueDate: formatDateForInput(new Date()),
       vendorName: "",
       billReference: "",
       lineItems: [],
     },
   });
 
-  // --- Data Fetching and Initialization ---
+  // Fetch accounts for the dropdown
   useEffect(() => {
     axios
       .get("http://localhost:8000/api/v1/accounts")
@@ -81,18 +82,20 @@ function VendorBillForm() {
       .catch(() => toast.error("Failed to load accounts."));
   }, []);
 
+  // Populate form from Purchase Order data
   useEffect(() => {
     if (poData && accounts.length > 0) {
+      // Ensure accounts are loaded first
       const purchaseExpenseAccount = accounts.find(
         (a) => a.accountName === "Purchase Expense A/c"
       );
       form.reset({
         purchaseOrderId: poData.purchaseOrderId,
         vendorName: poData.vendorName,
-        billReference: poAta.billReference,
+        billReference: poData.billReference,
         lineItems: poData.lineItems.map((item: any) => ({
           ...item,
-          productId: item.productId,
+          productId: item.productId, // Ensure productId is passed
           accountId: purchaseExpenseAccount?.id || 0,
         })),
         billDate: formatDateForInput(new Date()),
@@ -107,8 +110,8 @@ function VendorBillForm() {
     name: "lineItems",
   });
 
-  // --- Calculations ---
   const watchedLineItems = form.watch("lineItems");
+
   const totals = React.useMemo(() => {
     return watchedLineItems.reduce(
       (acc, item) => {
@@ -123,19 +126,23 @@ function VendorBillForm() {
     );
   }, [watchedLineItems]);
 
-  // --- Form Submission ---
   async function onSubmit(values: VendorBillFormValues) {
+    console.log("slkfjsdlj");
     setIsSubmitting(true);
 
     const payload = {
+      contactId: poData?.contactId, // Ensure contactId comes from poData
       purchaseOrderId: values.purchaseOrderId,
-      // The backend expects Date objects, so we convert the strings back here
-      billDate: new Date(values.billDate),
-      dueDate: new Date(values.dueDate),
+      billDate: values.billDate,
+      dueDate: values.dueDate,
       billReference: values.billReference,
+      totalAmount: totals.total,
       lines: values.lineItems.map((line) => ({
         productId: line.productId,
         accountId: line.accountId,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        taxRate: line.taxRate,
       })),
     };
 
@@ -148,10 +155,12 @@ function VendorBillForm() {
       );
 
       const billData = response.data.data;
+
       toast.success(
         `Bill ${billData.billNumber} created. Proceeding to payment...`
       );
 
+      // Navigate to payment page with bill data
       navigate("/payment", {
         state: {
           billData: {
@@ -159,6 +168,7 @@ function VendorBillForm() {
             contactId: billData.contactId,
             vendorName: values.vendorName,
             totalAmount: totals.total,
+            billNumber: billData.billNumber,
           },
         },
       });
@@ -169,28 +179,30 @@ function VendorBillForm() {
     }
   }
 
-  // Log errors to the console for easy debugging
-  useEffect(() => {
-    const subscription = form.watch(() => {
-      console.log("Form errors:", form.formState.errors);
-    });
-    return () => subscription.unsubscribe();
-  }, [form.watch, form.formState.errors]);
-
   return (
     <div className="max-w-7xl mx-auto my-10 font-sans p-4 bg-white rounded-lg shadow-sm">
-      {/* Header */}
       <div className="flex items-center justify-between mb-4 pb-4 border-b">
         <h1 className="text-2xl font-semibold text-gray-800">
           New Vendor Bill
         </h1>
-        {/* Navigation buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate("/")}
+            className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
+          >
+            Home
+          </button>
+          <button
+            onClick={() => navigate(-1)}
+            className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
+          >
+            Back
+          </button>
+        </div>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* Top Form Section (Vendor Info, Dates) */}
         <div className="p-4 border rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Left Column */}
           <div className="flex flex-col gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -210,8 +222,8 @@ function VendorBillForm() {
               <input
                 type="text"
                 {...form.register("vendorName")}
-                readOnly
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+                readOnly
               />
               {form.formState.errors.vendorName && (
                 <p className="text-xs text-red-600 mt-1">
@@ -231,7 +243,6 @@ function VendorBillForm() {
               />
             </div>
           </div>
-          {/* Right Column */}
           <div className="flex flex-col gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -266,33 +277,235 @@ function VendorBillForm() {
           </div>
         </div>
 
-        {/* Line Items Table */}
         <div className="border rounded-lg overflow-x-auto">
-          {/* Table implementation */}
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Product
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  HSN
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Account
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Qty
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Unit Price
+                </th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Untaxed Amount
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tax
+                </th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tax Amount
+                </th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total
+                </th>
+                <th className="px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {fields.map((item, index) => {
+                const {
+                  quantity = 0,
+                  unitPrice = 0,
+                  taxRate = 0,
+                } = watchedLineItems[index] || {};
+                const untaxedAmount = quantity * unitPrice;
+                const taxAmount = untaxedAmount * (taxRate / 100);
+                const totalAmount = untaxedAmount + taxAmount;
+                const errors = form.formState.errors.lineItems?.[index];
+
+                return (
+                  <tr key={item.id}>
+                    <td className="px-4 py-2 whitespace-nowrap min-w-[200px]">
+                      <input
+                        type="text"
+                        {...form.register(`lineItems.${index}.productName`)}
+                        className="w-full px-2 py-1 border rounded text-sm bg-gray-100"
+                        readOnly
+                      />
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap w-28">
+                      <input
+                        type="text"
+                        {...form.register(`lineItems.${index}.hsnNo`)}
+                        className="w-full px-2 py-1 border rounded text-sm bg-gray-100"
+                        readOnly
+                      />
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap min-w-[200px]">
+                      <select
+                        {...form.register(`lineItems.${index}.accountId`, {
+                          setValueAs: (v) => parseInt(v),
+                        })}
+                        className="w-full px-2 py-1 border rounded text-sm"
+                      >
+                        {accounts.map((acc) => (
+                          <option key={acc.id} value={acc.id}>
+                            {acc.accountName}
+                          </option>
+                        ))}
+                      </select>
+                      {errors?.accountId && (
+                        <p className="text-xs text-red-600 mt-1">
+                          {errors.accountId.message}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap w-24">
+                      <input
+                        type="number"
+                        {...form.register(`lineItems.${index}.quantity`)}
+                        className="w-full px-2 py-1 border rounded text-sm bg-gray-100"
+                        readOnly
+                      />
+                      {errors?.quantity && (
+                        <p className="text-xs text-red-600 mt-1">
+                          {errors.quantity.message}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap w-32">
+                      <input
+                        type="number"
+                        step="0.01"
+                        {...form.register(`lineItems.${index}.unitPrice`)}
+                        className="w-full px-2 py-1 border rounded text-sm bg-gray-100"
+                        readOnly
+                      />
+                      {errors?.unitPrice && (
+                        <p className="text-xs text-red-600 mt-1">
+                          {errors.unitPrice.message}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                      {untaxedAmount.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap w-32">
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          {...form.register(`lineItems.${index}.taxRate`)}
+                          className="w-16 px-2 py-1 border rounded text-sm bg-gray-100"
+                          readOnly
+                        />
+                        <span className="text-sm">%</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                      {taxAmount.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-bold text-gray-900">
+                      {totalAmount.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-center">
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <XCircle size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          <div className="p-3 border-t bg-gray-50">
+            <button
+              type="button"
+              onClick={() =>
+                append({
+                  productId: 0,
+                  productName: "",
+                  hsnNo: "",
+                  accountId:
+                    accounts.find(
+                      (a) => a.accountName === "Purchase Expense A/c"
+                    )?.id || 0,
+                  quantity: 1,
+                  unitPrice: 0,
+                  taxRate: 0,
+                })
+              }
+              className="text-purple-600 hover:text-purple-800 text-sm font-medium flex items-center gap-2"
+            >
+              <PlusCircle className="h-4 w-4" /> Add a line
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 p-4 bg-gray-50 border-t-2 gap-y-2">
+            <div className="col-start-1 md:col-start-3 text-sm font-medium text-gray-600">
+              Untaxed Amount:
+            </div>
+            <div className="text-right text-sm font-medium text-gray-800">
+              {totals.untaxed.toFixed(2)}
+            </div>
+            <div className="col-start-1 md:col-start-3 text-sm font-medium text-gray-600">
+              Taxes:
+            </div>
+            <div className="text-right text-sm font-medium text-gray-800">
+              {totals.tax.toFixed(2)}
+            </div>
+            <div className="col-start-1 md:col-start-3 mt-2 pt-2 border-t text-base font-bold text-gray-800">
+              Total:
+            </div>
+            <div className="mt-2 pt-2 border-t text-right text-base font-bold text-gray-800">
+              {totals.total.toFixed(2)}
+            </div>
+          </div>
         </div>
 
-        {/* General error message for the lineItems array */}
-        {form.formState.errors.lineItems &&
-          !Array.isArray(form.formState.errors.lineItems) && (
-            <p className="text-sm font-semibold text-red-600">
+        {/* Better root error message display */}
+        {form.formState.errors.lineItems?.root && (
+          <p className="text-sm font-semibold text-red-600 mt-4 p-2 bg-red-50 rounded-md">
+            {form.formState.errors.lineItems.root.message}
+          </p>
+        )}
+        {typeof form.formState.errors.lineItems === "object" &&
+          !Array.isArray(form.formState.errors.lineItems) &&
+          form.formState.errors.lineItems?.message && (
+            <p className="text-sm font-semibold text-red-600 mt-4 p-2 bg-red-50 rounded-md">
               {form.formState.errors.lineItems.message}
             </p>
           )}
 
-        {/* Action Buttons */}
         <div className="flex items-center justify-between mt-6">
           <div className="flex flex-wrap gap-2">
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 ..."
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 text-sm font-semibold flex items-center"
             >
               {isSubmitting && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
               {isSubmitting ? "Creating Bill..." : "Confirm"}
             </button>
-            {/* Other buttons like Print, Cancel */}
+            <button
+              type="button"
+              className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
+            >
+              Print
+            </button>
+            <button
+              type="button"
+              onClick={() => form.reset()}
+              className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </form>

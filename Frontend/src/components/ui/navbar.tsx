@@ -98,7 +98,7 @@ function DashboardNavbar() {
               <NavigationMenuTrigger>Sale</NavigationMenuTrigger>
               <NavigationMenuContent>
                 <ul className="grid w-[400px] gap-3 p-4 md:w-[250px] lg:w-[300px]">
-                  <ListItem href="/order" title="Sale Order">
+                  <ListItem href="/sale-order" title="Sale Order">
                     Manage customer sales orders.
                   </ListItem>
                   <ListItem href="/bill" title="Sale Invoice">

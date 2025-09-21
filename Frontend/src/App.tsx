@@ -20,6 +20,10 @@ import BillLedger from "./Pages/Ledger";
 import ProfitLossStatement from "./Pages/PLStatement";
 import BalanceSheet from "./Pages/Balance-sheet";
 import { MasterDataListPage } from "./Pages/MasterDataListPage";
+import CustomerInvoicePortal from "./Pages/CustomerInvoiceViewPortal";
+import PaymentPage from "./Pages/PaymentPage";
+import PaymentSuccessPage from "./Pages/PaymentSuccessPage";
+import SalesOrderForm from "./Pages/SaleOrder";
 
 function App() {
   return (
@@ -49,6 +53,7 @@ function App() {
           <Route path="/tax-master/create" element={<TaxForm />} />
           <Route path="/chart-of-accounts/create" element={<AccountForm />} />
           <Route path="/order" element={<PurchaseOrderForm />} />
+          <Route path="/sale-order" element={<SalesOrderForm />} />
           <Route path="/bill" element={<VendorBillForm />} />
           <Route path="/payment" element={<BillPaymentForm />} />
           <Route path="/ledger" element={<BillLedger />} />
