@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronRight, PlusCircle, XCircle } from "lucide-react";
+import { ChevronRight, PlusCircle, XCircle, Loader2 } from "lucide-react";
 import axios from "axios";
+import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 // --- Zod Schema for Line Items and the Main Form ---
 const lineItemSchema = z.object({
@@ -25,58 +27,69 @@ const purchaseOrderSchema = z.object({
 
 type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 
-// Vendor interface
+// --- API Interfaces ---
 interface Vendor {
   id: number;
   contactName: string;
-  email: string;
-  phone: string;
+}
+
+interface Product {
+  id: number;
+  productName: string;
+  purchasePrice: number;
+  purchaseTax: number;
+  hsnCode?: string;
+}
+
+interface Tax {
+  id: number;
+  taxName: string;
+  value: number;
 }
 
 function PurchaseOrderForm() {
-  // State for holding vendor data and loading status
+  const navigate = useNavigate();
+  // State for holding API data and loading status
   const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [loadingVendors, setLoadingVendors] = useState(true);
-
-  // Effect to fetch vendors when the component mounts
-  useEffect(() => {
-    const fetchVendors = async () => {
-      setLoadingVendors(true);
-      try {
-        // Fetch vendors from the backend API using the getAllContacts endpoint
-        const response = await axios.get("/api/v1/contacts?type=vendor");
-
-        // The backend controller wraps the array in a 'data' object
-        if (response.data && Array.isArray(response.data.data)) {
-          setVendors(response.data.data);
-        } else {
-          console.error("Unexpected API response format:", response.data);
-          setVendors([]);
-        }
-      } catch (error) {
-        console.error("Failed to fetch vendors:", error);
-        // Optionally, set an error state here to show in the UI
-        setVendors([]); // Clear vendors on error
-      } finally {
-        setLoadingVendors(false);
-      }
-    };
-
-    fetchVendors();
-  }, []); // Empty dependency array ensures this runs only once on mount
+  const [products, setProducts] = useState<Product[]>([]);
+  const [taxes, setTaxes] = useState<Tax[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<PurchaseOrderFormValues>({
     resolver: zodResolver(purchaseOrderSchema),
     defaultValues: {
       poNumber: "P00001",
       poDate: new Date(),
-      vendorId: "", // Corrected this from 'vendorName' to match schema
+      vendorId: "",
       reference: "",
-      lineItems: [
-        { productName: "", quantity: 1, unitPrice: 0, taxRate: 0 }, // Set qty to 1 to pass validation by default
-      ],
+      lineItems: [{ productName: "", quantity: 1, unitPrice: 0, taxRate: 0 }],
     },
   });
+
+  // Effect to fetch initial data when the component mounts
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoadingData(true);
+      try {
+        const [vendorRes, productRes, taxRes] = await Promise.all([
+          axios.get("http://localhost:8000/api/v1/contacts?type=vendor"),
+          axios.get("http://localhost:8000/api/v1/products"),
+          axios.get("http://localhost:8000/api/v1/taxes"),
+        ]);
+
+        if (vendorRes.data?.data) setVendors(vendorRes.data.data);
+        if (productRes.data?.data) setProducts(productRes.data.data);
+        if (taxRes.data?.data) setTaxes(taxRes.data.data);
+      } catch (error) {
+        console.error("Failed to fetch initial data:", error);
+        toast.error("Failed to fetch initial data.");
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -99,12 +112,78 @@ function PurchaseOrderForm() {
     );
   }, [watchedLineItems]);
 
-  function onSubmit(values: PurchaseOrderFormValues) {
-    console.log("Purchase Order Submitted:", {
-      ...values,
-      totals,
+  async function onSubmit(values: PurchaseOrderFormValues) {
+    setIsSubmitting(true);
+
+    const apiCall = async () => {
+      const payload = {
+        contactId: parseInt(values.vendorId, 10),
+        reference: values.reference,
+        poDate: values.poDate,
+        poNumber: values.poNumber,
+        lines: values.lineItems.map((item) => {
+          const product = products.find(
+            (p) => p.productName === item.productName
+          );
+          const tax = taxes.find((t) => Number(t.value) === item.taxRate);
+
+          if (!product) {
+            throw new Error(`Product "${item.productName}" not found.`);
+          }
+          if (!tax) {
+            throw new Error(
+              `Tax rate of ${item.taxRate}% for "${item.productName}" not found.`
+            );
+          }
+
+          return {
+            productId: product.id,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            taxId: tax.id,
+          };
+        }),
+      };
+      const response = await axios.post(
+        "http://localhost:8000/api/v1/purchase-orders",
+        payload
+      );
+      return response.data.data;
+    };
+
+    toast.promise(apiCall(), {
+      loading: "Creating Purchase Order...",
+      success: (poData) => {
+        const selectedVendor = vendors.find(
+          (v) => v.id === parseInt(values.vendorId)
+        );
+
+        const navigationState = {
+          purchaseOrderId: poData.id,
+          vendorName: selectedVendor?.contactName,
+          billReference: values.reference,
+          lineItems: values.lineItems.map((item) => {
+            const product = products.find(
+              (p) => p.productName === item.productName
+            );
+            return {
+              ...item,
+              hsnNo: product?.hsnCode || "",
+              accountName: "Purchase Expense A/c",
+            };
+          }),
+        };
+
+        navigate("/bill", { state: { poData: navigationState } });
+        return `PO #${poData.poNumber} created. Navigating to create bill...`;
+      },
+      error: (err) => {
+        return err.message || "Failed to create Purchase Order.";
+      },
+      finally: () => {
+        setIsSubmitting(false);
+      },
     });
-    alert("PO submitted successfully! Check the console for the form data.");
   }
 
   // Helper to format date for the input defaultValue
@@ -117,40 +196,39 @@ function PurchaseOrderForm() {
 
   return (
     <div className="max-w-7xl mx-auto my-10 font-sans p-4 bg-white rounded-lg shadow-sm">
-      {/* --- Top Navigation Buttons --- */}
       <div className="flex items-center justify-between mb-4 pb-4 border-b">
         <h1 className="text-2xl font-semibold text-gray-800">
           New Purchase Order
         </h1>
         <div className="flex gap-2">
-          <button className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium">
+          <button
+            onClick={() => navigate("/")}
+            className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
+          >
             Home
           </button>
-          <button className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium">
+          <button
+            onClick={() => navigate(-1)}
+            className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
+          >
             Back
           </button>
         </div>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* --- PO Header Section --- */}
         <div className="p-4 border rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Left Column */}
           <div className="flex flex-col gap-4">
-            {/* PO Number */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 PO No.
               </label>
               <input
                 type="text"
-                value={form.getValues("poNumber")}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
+                {...form.register("poNumber")}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
               />
             </div>
-
-            {/* Vendor Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Vendor Name
@@ -158,13 +236,13 @@ function PurchaseOrderForm() {
               <select
                 {...form.register("vendorId")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
-                disabled={loadingVendors}
+                disabled={loadingData}
               >
                 <option value="">
-                  {loadingVendors ? "Loading vendors..." : "Select a vendor"}
+                  {loadingData ? "Loading..." : "Select a vendor"}
                 </option>
                 {vendors.map((vendor) => (
-                  <option key={vendor.id} value={vendor.id}>
+                  <option key={vendor.id} value={String(vendor.id)}>
                     {vendor.contactName}
                   </option>
                 ))}
@@ -176,10 +254,7 @@ function PurchaseOrderForm() {
               )}
             </div>
           </div>
-
-          {/* Right Column */}
           <div className="flex flex-col gap-4">
-            {/* PO Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 PO Date
@@ -198,8 +273,6 @@ function PurchaseOrderForm() {
                 </p>
               )}
             </div>
-
-            {/* Reference */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Reference
@@ -215,13 +288,16 @@ function PurchaseOrderForm() {
         </div>
 
         <div className="flex items-center justify-between">
-          {/* --- Action Bar --- */}
           <div className="flex flex-wrap gap-2">
             <button
               type="submit"
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 text-sm font-semibold"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 text-sm font-semibold flex items-center"
             >
-              Confirm
+              {isSubmitting && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {isSubmitting ? "Submitting..." : "Confirm"}
             </button>
             <button
               type="button"
@@ -231,40 +307,22 @@ function PurchaseOrderForm() {
             </button>
             <button
               type="button"
-              className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
-            >
-              Send
-            </button>
-            <button
-              type="button"
               onClick={() => form.reset()}
               className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm font-medium"
             >
               Cancel
             </button>
           </div>
-
-          {/* Status indicators */}
-          <div className="hidden md:flex items-center gap-2 text-sm text-gray-500">
-            <span>Draft</span>
-            <ChevronRight size={16} />
-            <span className="font-semibold text-purple-600">Confirm</span>
-            <ChevronRight size={16} />
-            <span>Billed</span>
-            <ChevronRight size={16} />
-            <span>Cancelled</span>
-          </div>
         </div>
 
-        {/* --- Line Items Table --- */}
         <div className="border rounded-lg overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
                   Sr.
                 </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
                   Product
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -277,28 +335,65 @@ function PurchaseOrderForm() {
                   Tax
                 </th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Subtotal
+                  Untaxed Amount
                 </th>
-                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tax Amount
+                </th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total
+                </th>
+                <th className="px-4 py-2"></th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {fields.map((item, index) => {
-                const quantity = watchedLineItems[index]?.quantity || 0;
-                const unitPrice = watchedLineItems[index]?.unitPrice || 0;
-                const subtotal = quantity * unitPrice;
+                const {
+                  quantity = 0,
+                  unitPrice = 0,
+                  taxRate = 0,
+                } = watchedLineItems[index] || {};
+                const untaxedAmount = quantity * unitPrice;
+                const taxAmount = untaxedAmount * (taxRate / 100);
+                const total = untaxedAmount + taxAmount;
+
                 return (
                   <tr key={item.id}>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
                       {index + 1}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap min-w-[200px]">
-                      <input
-                        type="text"
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <select
                         {...form.register(`lineItems.${index}.productName`)}
                         className="w-full px-2 py-1 border rounded text-sm"
-                        placeholder="Product name"
-                      />
+                        disabled={loadingData}
+                        onChange={(e) => {
+                          const name = e.target.value;
+                          const product = products.find(
+                            (p) => p.productName === name
+                          );
+                          form.setValue(`lineItems.${index}.productName`, name);
+                          if (product) {
+                            form.setValue(
+                              `lineItems.${index}.unitPrice`,
+                              product.purchasePrice
+                            );
+                            form.setValue(
+                              `lineItems.${index}.taxRate`,
+                              product.purchaseTax
+                            );
+                          }
+                        }}
+                      >
+                        <option value="">
+                          {loadingData ? "Loading..." : "Select a product"}
+                        </option>
+                        {products.map((product) => (
+                          <option key={product.id} value={product.productName}>
+                            {product.productName}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap w-24">
                       <input
@@ -326,7 +421,13 @@ function PurchaseOrderForm() {
                       </div>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                      {subtotal.toFixed(2)}
+                      {untaxedAmount.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                      {taxAmount.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-bold text-gray-900">
+                      {total.toFixed(2)}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-center">
                       <button
@@ -343,7 +444,6 @@ function PurchaseOrderForm() {
             </tbody>
           </table>
 
-          {/* Add New Line Button */}
           <div className="p-3 border-t bg-gray-50">
             <button
               type="button"
@@ -361,7 +461,6 @@ function PurchaseOrderForm() {
             </button>
           </div>
 
-          {/* Totals Section */}
           <div className="grid grid-cols-2 md:grid-cols-4 p-4 bg-gray-50 border-t-2 gap-y-2">
             <div className="col-start-1 md:col-start-3 text-sm font-medium text-gray-600">
               Untaxed Amount:

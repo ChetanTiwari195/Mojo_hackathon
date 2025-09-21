@@ -37,6 +37,25 @@ export const createContact = async (req, res) => {
   }
 };
 
+// Get only contact names
+// Add this alongside your other controller functions
+export const getContactNames = async (req, res) => {
+  try {
+    const contacts = await ContactMaster.findAll({
+      attributes: ["id", "contactName"], // Fetch both id and contactName
+      where: {
+        type: ["vendor", "both"], // Ensure you only get vendors
+      },
+    });
+    res.status(200).json({ data: contacts });
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to fetch contact names.",
+      details: error.message,
+    });
+  }
+};
+
 // Get all contacts, with optional filtering by type
 export const getAllContacts = async (req, res) => {
   try {

@@ -143,6 +143,20 @@ export const updateProduct = async (req, res) => {
   }
 };
 
+export const getProductListForOrder = async (req, res) => {
+  try {
+    const products = await Product.findAll({
+      attributes: ["id", "productName", "purchasePrice", "purchaseTax"],
+      order: [["productName", "ASC"]],
+    });
+    res.status(200).json({ data: products });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: "Failed to fetch product list.", details: error.message });
+  }
+};
+
 // Delete a product
 export const deleteProduct = async (req, res) => {
   try {

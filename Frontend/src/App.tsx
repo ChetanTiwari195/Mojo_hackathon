@@ -1,15 +1,14 @@
-// file: App.js
-
 import "./App.css";
 import { Route, Routes } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 
 // Page and Component Imports
-import RoleBasedRoutes from "./components/RoleBasedRoutes"; 
+import RoleBasedRoutes from "./components/RoleBasedRoutes";
 import Dashboard from "./Pages/Home";
 import { LoginForm } from "./Pages/Login";
 import { SignupForm } from "./Pages/SignUp";
 import CreateUserForm from "./Pages/CreateUser";
+import { DashboardNavbar } from "./components/ui/navbar";
 import ContactForm from "./Pages/ContactMaster";
 import ProductForm from "./Pages/Product-Master";
 import TaxForm from "./Pages/TaxMaster";
@@ -21,9 +20,6 @@ import BillLedger from "./Pages/Ledger";
 import ProfitLossStatement from "./Pages/PLStatement";
 import BalanceSheet from "./Pages/Balance-sheet";
 import { MasterDataListPage } from "./Pages/MasterDataListPage";
-import CustomerInvoicePortal from "./Pages/CustomerInvoiceViewPortal";
-import PaymentPage from "./Pages/PaymentPage";
-import PaymentSuccessPage from "./Pages/PaymentSuccessPage";
 
 function App() {
   return (

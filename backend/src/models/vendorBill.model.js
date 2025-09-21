@@ -15,11 +15,11 @@ const VendorBill = sequelize.define("VendorBill", {
     unique: true,
   },
   billDate: {
-    type: DataTypes.DATE,
+    type: DataTypes.DATEONLY, // Changed from DATE to DATEONLY
     allowNull: false,
   },
   dueDate: {
-    type: DataTypes.DATE,
+    type: DataTypes.DATEONLY, // Changed from DATE to DATEONLY
     allowNull: false,
   },
   billReference: {
