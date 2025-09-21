@@ -19,6 +19,8 @@ This project is the result of the collaborative effort of **Team Mojo**.
 - **Chetan Tiwari**
 - **Atul Kumar Pandey**
 
+- **Video Link** : https://youtu.be/Zv7XZhpuxgY
+
 ## 🛠️ Getting Started
 
 ### Prerequisites
